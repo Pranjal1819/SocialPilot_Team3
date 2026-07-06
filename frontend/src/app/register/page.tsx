@@ -1,74 +1,90 @@
 "use client";
 
-import Input from "../../components/Input";
+import { useState } from "react";
+import Link from "next/link";
+import { FaEnvelope, FaLock, FaUser, FaEye, FaEyeSlash } from "react-icons/fa";
+import AuthLayout from "../../components/AuthLayout";
 import Button from "../../components/Button";
 import { COLORS } from "../../styles/colors";
 
 export default function RegisterPage() {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: COLORS.background }}
+    <AuthLayout
+      title="Create Account"
+      subtitle="Start managing your social media accounts today."
     >
-      <div
-        className="w-full max-w-md rounded-2xl shadow-xl p-8"
-        style={{ backgroundColor: COLORS.card }}
-      >
-        <h1
-          className="text-3xl font-bold text-center mb-2"
-          style={{ color: COLORS.primary }}
-        >
-          Create Account
-        </h1>
+      <div className="space-y-5">
 
-        <p
-          className="text-center mb-8"
-          style={{ color: COLORS.text }}
-        >
-          Join SocialPilot today
-        </p>
-
-        <div className="space-y-5">
-          <Input
+        {/* Full Name */}
+        <div className="relative">
+          <FaUser className="absolute left-4 top-4 text-gray-400" />
+          <input
             type="text"
             placeholder="Full Name"
-          />
-
-          <Input
-            type="email"
-            placeholder="Email Address"
-          />
-
-          <Input
-            type="password"
-            placeholder="Password"
-          />
-
-          <Input
-            type="password"
-            placeholder="Confirm Password"
-          />
-
-          <Button
-            text="Register"
-            type="submit"
+            className="w-full border border-gray-300 rounded-lg py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
 
+        {/* Email */}
+        <div className="relative">
+          <FaEnvelope className="absolute left-4 top-4 text-gray-400" />
+          <input
+            type="email"
+            placeholder="Email Address"
+            className="w-full border border-gray-300 rounded-lg py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+        </div>
+
+        {/* Password */}
+        <div className="relative">
+          <FaLock className="absolute left-4 top-4 text-gray-400" />
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            className="w-full border border-gray-300 rounded-lg py-3 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-4 text-gray-500"
+          >
+            {showPassword ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </div>
+
+        {/* Confirm Password */}
+        <div className="relative">
+          <FaLock className="absolute left-4 top-4 text-gray-400" />
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Confirm Password"
+            className="w-full border border-gray-300 rounded-lg py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+        </div>
+
+        <Button
+          text="Create Account"
+          type="submit"
+        />
+
         <p
-          className="text-center mt-6"
+          className="text-center"
           style={{ color: COLORS.text }}
         >
           Already have an account?{" "}
-          <a
+          <Link
             href="/login"
             className="font-semibold"
             style={{ color: COLORS.secondary }}
           >
             Login
-          </a>
+          </Link>
         </p>
+
       </div>
-    </div>
+    </AuthLayout>
   );
 }
