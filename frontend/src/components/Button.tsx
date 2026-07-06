@@ -1,20 +1,28 @@
 "use client";
 
+import { COLORS } from "../styles/colors";
+
 type ButtonProps = {
   text: string;
   type?: "button" | "submit";
+  loading?: boolean;
 };
 
 export default function Button({
   text,
   type = "button",
+  loading = false,
 }: ButtonProps) {
   return (
     <button
       type={type}
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+      disabled={loading}
+      className="w-full py-3 rounded-lg font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
+      style={{
+        backgroundColor: loading ? "#94A3B8" : COLORS.secondary,
+      }}
     >
-      {text}
+      {loading ? "Please wait..." : text}
     </button>
   );
 }
