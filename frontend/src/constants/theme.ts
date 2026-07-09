@@ -5,13 +5,11 @@ export const COLORS = {
 
   background: "#F8FAFC",
   sidebar: "#1E293B",
-  card: "#FFFFFF",
+  card: "#FFFF",
 
   success: "#10B981",
   warning: "#F59E0B",
   error: "#EF4444",
 
   text: "#0F172A",
-  textSecondary: "#64748B",
-  textMuted: "#94A3B8",
 } as const;
