@@ -1,22 +1,20 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { ROLE_LABELS } from "@/types/user";
+import FilterDropdown from "./FilterDropdown";
+import GlobalSearch from "./GlobalSearch";
 
 export default function Navbar() {
   const { name, role } = useCurrentUser();
   const initial = name.charAt(0).toUpperCase();
 
   return (
-    <header className="h-24 bg-[#F7FDFF] border-b border-[#CAF0F8] flex items-center justify-between px-8 gap-8">
-      <div className="flex flex-1 max-w-md items-center gap-3 rounded-xl border border-[#ADE8F4]/60 bg-white px-4 py-3.5 transition-all duration-200 ease-in-out focus-within:border-[#0096C7] focus-within:ring-4 focus-within:ring-[#CAF0F8]">
-        <Search size={18} className="text-slate-400 shrink-0" />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none"
-        />
+    <header className="h-24 bg-[#F7FDFF] border-b border-[#CAF0F8] flex items-center justify-between px-8 gap-4">
+      <div className="flex flex-1 items-center gap-3 max-w-3xl">
+        <GlobalSearch />
+        <FilterDropdown />
       </div>
 
       <div className="flex items-center gap-5 shrink-0">
