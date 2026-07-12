@@ -8,39 +8,45 @@ export default function Home() {
       style={{ backgroundColor: COLORS.background }}
     >
       {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center text-center px-6 py-24">
+      <section className="max-w-7xl mx-auto px-6 py-24 text-center">
 
         <h1
-          className="text-6xl font-bold mb-6"
-          style={{ color: COLORS.primary }}
+          className="text-6xl md:text-7xl font-bold tracking-tight mb-6"
+          style={{ color: COLORS.text }}
         >
-          SocialPilot 🚀
+          SocialPilot 
         </h1>
 
         <p
-          className="max-w-2xl text-lg mb-10"
-          style={{ color: COLORS.text }}
+          className="max-w-3xl mx-auto text-lg leading-8 mb-12"
+          style={{ color: COLORS.body }}
         >
-          Manage, schedule and analyze all your social media accounts
-          from one powerful platform.
+          Plan, publish and analyze your social media content
+          from one unified platform.
         </p>
 
-        <div className="flex gap-5">
+        <div className="flex flex-col sm:flex-row justify-center gap-5">
 
           <Link
             href="/register"
-            className="px-8 py-4 rounded-lg text-white font-semibold shadow-lg"
-            style={{ backgroundColor: COLORS.secondary }}
+            className="px-8 py-4 rounded-xl text-white font-semibold transition-all duration-300 hover:-translate-y-1"
+            style={{
+              background:
+                "linear-gradient(135deg, #0096C7 0%, #0077B6 100%)",
+              boxShadow:
+                "0 12px 30px -10px rgba(0,119,182,0.4)",
+            }}
           >
             Get Started
           </Link>
 
           <Link
             href="/login"
-            className="px-8 py-4 rounded-lg font-semibold border-2"
+            className="px-8 py-4 rounded-xl font-semibold border transition-all duration-300 hover:bg-white"
             style={{
-              borderColor: COLORS.secondary,
-              color: COLORS.secondary,
+              borderColor: COLORS.inputBorder,
+              color: COLORS.primary,
+              backgroundColor: "#FFFFFF",
             }}
           >
             Login
@@ -51,65 +57,89 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 pb-20">
+      <section className="max-w-7xl mx-auto px-6 pb-24">
 
         <h2
-          className="text-4xl font-bold text-center mb-12"
-          style={{ color: COLORS.primary }}
+          className="text-4xl font-bold tracking-tight text-center mb-14"
+          style={{ color: COLORS.text }}
         >
           Why Choose SocialPilot?
         </h2>
 
         <div className="grid md:grid-cols-3 gap-8">
 
+          {/* Card 1 */}
           <div
-            className="rounded-xl shadow-lg p-8"
-            style={{ backgroundColor: COLORS.card }}
+            className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-1"
+            style={{
+              backgroundColor: COLORS.card,
+              boxShadow:
+                "0 8px 30px -12px rgba(15,23,42,0.12)",
+            }}
           >
             <h3
-              className="text-xl font-semibold mb-3"
-              style={{ color: COLORS.secondary }}
+              className="text-2xl font-semibold mb-4"
+              style={{ color: COLORS.primary }}
             >
               📅 Schedule Posts
             </h3>
 
-            <p style={{ color: COLORS.text }}>
-              Plan and publish your social media content
-              across multiple platforms effortlessly.
+            <p
+              className="leading-7"
+              style={{ color: COLORS.body }}
+            >
+              Plan and publish content across multiple
+              social media platforms effortlessly.
             </p>
           </div>
 
+          {/* Card 2 */}
           <div
-            className="rounded-xl shadow-lg p-8"
-            style={{ backgroundColor: COLORS.card }}
+            className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-1"
+            style={{
+              backgroundColor: COLORS.card,
+              boxShadow:
+                "0 8px 30px -12px rgba(15,23,42,0.12)",
+            }}
           >
             <h3
-              className="text-xl font-semibold mb-3"
-              style={{ color: COLORS.secondary }}
+              className="text-2xl font-semibold mb-4"
+              style={{ color: COLORS.primary }}
             >
               📈 Analytics
             </h3>
 
-            <p style={{ color: COLORS.text }}>
+            <p
+              className="leading-7"
+              style={{ color: COLORS.body }}
+            >
               Track engagement, audience growth and
-              campaign performance using real-time insights.
+              campaign performance with real-time insights.
             </p>
           </div>
 
+          {/* Card 3 */}
           <div
-            className="rounded-xl shadow-lg p-8"
-            style={{ backgroundColor: COLORS.card }}
+            className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-1"
+            style={{
+              backgroundColor: COLORS.card,
+              boxShadow:
+                "0 8px 30px -12px rgba(15,23,42,0.12)",
+            }}
           >
             <h3
-              className="text-xl font-semibold mb-3"
-              style={{ color: COLORS.secondary }}
+              className="text-2xl font-semibold mb-4"
+              style={{ color: COLORS.primary }}
             >
               👥 Team Collaboration
             </h3>
 
-            <p style={{ color: COLORS.text }}>
-              Work together with content creators,
-              marketing teams and administrators.
+            <p
+              className="leading-7"
+              style={{ color: COLORS.body }}
+            >
+              Collaborate with creators, marketing teams
+              and administrators from one workspace.
             </p>
           </div>
 

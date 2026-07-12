@@ -16,47 +16,63 @@ export default function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: COLORS.background }}
+      className="min-h-screen flex items-center justify-center px-6 py-10"
+      style={{
+        backgroundColor: COLORS.background,
+      }}
     >
-      <div className="grid md:grid-cols-2 w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden">
-        
-        {/* Left Side */}
+      <div
+        className="grid md:grid-cols-2 w-full max-w-6xl overflow-hidden rounded-3xl"
+        style={{
+          backgroundColor: COLORS.card,
+          boxShadow: "0 8px 30px -12px rgba(15,23,42,0.12)",
+        }}
+      >
+        {/* Left Panel */}
         <div
-          className="hidden md:flex flex-col justify-center items-center p-10 text-white"
-          style={{ backgroundColor: COLORS.primary }}
+          className="hidden md:flex flex-col justify-center items-center text-white px-12 py-16"
+          style={{
+            background:
+              "linear-gradient(135deg, #0096C7 0%, #0077B6 100%)",
+          }}
         >
-          <h1 className="text-5xl font-bold mb-4">
+          <h1 className="text-5xl font-bold tracking-tight mb-6">
             SocialPilot
           </h1>
 
-          <p className="text-center text-lg opacity-90">
+          <p className="text-lg text-center leading-8 opacity-90 max-w-sm">
             Manage all your social media platforms
+            <br />
             from one place.
           </p>
         </div>
 
-        {/* Right Side */}
-        <div className="p-10 flex flex-col justify-center">
+        {/* Right Panel */}
+        <div className="bg-white px-10 py-12 flex flex-col justify-center">
 
           <h2
-            className="text-3xl font-bold mb-2"
-            style={{ color: COLORS.primary }}
+            className="text-3xl font-bold tracking-tight mb-3"
+            style={{
+              color: COLORS.text,
+            }}
           >
             {title}
           </h2>
 
-          <p
-            className="mb-8"
-            style={{ color: COLORS.text }}
-          >
-            {subtitle}
-          </p>
+          {subtitle && (
+            <p
+              className="mb-8"
+              style={{
+                color: COLORS.body,
+              }}
+            >
+              {subtitle}
+            </p>
+          )}
 
           {children}
 
         </div>
-
       </div>
     </div>
   );
