@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { COLORS } from "../styles/colors";
+import { COLORS } from "@/constants/theme";
 
 type AuthLayoutProps = {
   title: string;
@@ -18,7 +18,7 @@ export default function AuthLayout({
     <div
       className="min-h-screen flex items-center justify-center px-6 py-10"
       style={{
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.authBackground,
       }}
     >
       <div
@@ -32,8 +32,11 @@ export default function AuthLayout({
         <div
           className="hidden md:flex flex-col justify-center items-center text-white px-12 py-16"
           style={{
-            background:
-              "linear-gradient(135deg, #0096C7 0%, #0077B6 100%)",
+            background: `linear-gradient(
+  135deg,
+  ${COLORS.ocean} 0%,
+  ${COLORS.oceanDark} 100%
+)`,
           }}
         >
           <h1 className="text-5xl font-bold tracking-tight mb-6">

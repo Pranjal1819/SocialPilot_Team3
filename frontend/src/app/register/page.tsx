@@ -12,9 +12,9 @@ import {
   FaUserTag,
 } from "react-icons/fa";
 
-import AuthLayout from "../../components/AuthLayout";
-import Button from "../../components/Button";
-import { COLORS } from "../../styles/colors";
+import AuthLayout from "@/components/AuthLayout";
+import Button from "@/components/Button";
+import { COLORS } from "@/constants/theme";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -78,7 +78,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaUser
             className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+           style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -94,7 +94,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaEnvelope
             className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+            style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -110,7 +110,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaLock
             className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+            style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -125,7 +125,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+           style={{ color: COLORS.ocean }}
           >
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </button>
@@ -135,7 +135,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaLock
             className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+            style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -150,7 +150,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaBuilding
             className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.secondary }}
+           style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -166,7 +166,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaUserTag
             className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
-            style={{ color: COLORS.secondary }}
+            style={{ color: COLORS.ocean }}
           />
 
           <select
@@ -178,7 +178,7 @@ export default function RegisterPage() {
             <option value="">Select Role</option>
             <option value="Content Creator">Content Creator</option>
             <option value="Marketing Team">Marketing Team</option>
-            <option value="Business Owner">Business Owner</option>
+            <option value="Business User">Business User</option>
             <option value="Administrator">Administrator</option>
           </select>
         </div>

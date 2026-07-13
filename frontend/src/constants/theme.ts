@@ -1,11 +1,17 @@
 export const COLORS = {
-  // Brand Colors
-  primary: "#0077B6",
-  secondary: "#0096C7",
-  accent: "#CAF0F8",
+  // Brand
+  primary: "#2563EB",
+  secondary: "#0F766E",
+  accent: "#99F6E4",
+
+  // Auth/ocean-blue family (from dashboard + auth pages)
+  ocean: "#0096C7",
+  oceanDark: "#0077B6",
+  oceanTint: "#CAF0F8",
 
   // Layout
-  background: "#F4FBFD",
+  background: "#F8FAFC",
+  authBackground: "#F4FBFD",
   sidebar: "#1E293B",
   card: "#FFFFFF",
 

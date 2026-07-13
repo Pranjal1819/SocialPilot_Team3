@@ -1,5 +1,7 @@
 "use client";
 
+import { COLORS } from "@/constants/theme";
+
 type ButtonProps = {
   text: string;
   type?: "button" | "submit";
@@ -31,8 +33,8 @@ export default function Button({
       "
       style={{
         background: loading
-          ? "#94A3B8"
-          : "linear-gradient(135deg, #0096C7 0%, #0077B6 100%)",
+          ? COLORS.placeholder
+          : `linear-gradient(135deg, ${COLORS.ocean} 0%, ${COLORS.oceanDark} 100%)`,
         boxShadow: loading
           ? "none"
           : "0 12px 30px -10px rgba(0,119,182,0.4)",

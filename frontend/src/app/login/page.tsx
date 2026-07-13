@@ -8,9 +8,9 @@ import {
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
-import AuthLayout from "../../components/AuthLayout";
-import Button from "../../components/Button";
-import { COLORS } from "../../styles/colors";
+import AuthLayout from "@/components/AuthLayout";
+import Button from "@/components/Button";
+import { COLORS } from "@/constants/theme";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -81,7 +81,7 @@ export default function LoginPage() {
           <div className="relative">
             <FaEnvelope
               className="absolute left-4 top-4"
-              style={{ color: COLORS.secondary }}
+              style={{ color: COLORS.ocean }}
             />
 
             <input
@@ -108,7 +108,7 @@ export default function LoginPage() {
           <div className="relative">
             <FaLock
               className="absolute left-4 top-4"
-              style={{ color: COLORS.secondary }}
+              style={{ color: COLORS.ocean }}
             />
 
             <input
@@ -126,7 +126,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-4 top-4"
-              style={{ color: COLORS.secondary }}
+              style={{ color: COLORS.ocean }}
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
@@ -166,7 +166,7 @@ export default function LoginPage() {
             <option value="">Select Role</option>
             <option>Content Creator</option>
             <option>Marketing Team</option>
-            <option>Business Owner</option>
+            <option>Business User</option>
             <option>Administrator</option>
           </select>
 
@@ -192,7 +192,7 @@ export default function LoginPage() {
           <Link
             href="/register"
             className="font-semibold"
-            style={{ color: COLORS.secondary }}
+            style={{ color: COLORS.ocean }}
           >
             Register
           </Link>
