@@ -14,8 +14,8 @@ export function useCurrentUser(): CurrentUser {
   if (user) return user;
 
   return {
-    name: "Guest",
-    email: "guest@socialpilot.com",
-    role: "content_creator",
+    name: "Pranjal",
+    email: "pranjal@socialpilot.com",
+    role: "administrator",
   };
 }
