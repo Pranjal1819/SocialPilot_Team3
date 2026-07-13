@@ -1,16 +1,21 @@
 "use client";
 
+import { useAuth } from "@/contexts/AuthContext";
 import { CurrentUser } from "@/types/user";
 
 /**
- * Temporary mock user until the User Management module (auth/login) is wired up.
- * Replace the return value below once real session data exists. Every component
- * that needs the current user's name/role reads from this one hook — so the
- * real-auth swap is a single-file change.
+ * Reads the currently logged-in user from AuthContext (real backend session).
+ * Falls back to a mock user only if no one is logged in, so the dashboard
+ * still renders during development without requiring a live login.
  */
 export function useCurrentUser(): CurrentUser {
+  const { user } = useAuth();
+
+  if (user) return user;
+
   return {
-    name: "Pranjal",
-    role: "administrator",
+    name: "Guest",
+    email: "guest@socialpilot.com",
+    role: "content_creator",
   };
 }
