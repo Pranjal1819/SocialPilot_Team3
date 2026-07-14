@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import authService from "@/lib/authService";
 import {
   FaEnvelope,
   FaLock,
@@ -9,7 +11,6 @@ import {
   FaEye,
   FaEyeSlash,
   FaBuilding,
-  FaUserTag,
 } from "react-icons/fa";
 
 import AuthLayout from "@/components/AuthLayout";
@@ -24,11 +25,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [organization, setOrganization] = useState("");
-  const [role, setRole] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!name) {
       alert("Full Name is required");
       return;
@@ -49,11 +50,6 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!role) {
-      alert("Please select a role");
-      return;
-    }
-
     if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
@@ -61,10 +57,21 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await authService.register(name, email, password);
+
       alert("Registration Successful!");
-    }, 2000);
+
+      router.push("/login");
+    } catch (err) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Registration failed"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,7 +85,7 @@ export default function RegisterPage() {
         <div className="relative">
           <FaUser
             className="absolute left-4 top-1/2 -translate-y-1/2"
-           style={{ color: COLORS.ocean }}
+            style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -125,7 +132,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-4 top-1/2 -translate-y-1/2"
-           style={{ color: COLORS.ocean }}
+            style={{ color: COLORS.ocean }}
           >
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </button>
@@ -146,11 +153,12 @@ export default function RegisterPage() {
             className="w-full rounded-xl border py-3.5 pl-12 pr-4 bg-slate-50 border-slate-200 transition-all duration-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none"
           />
         </div>
-                {/* Organization (Optional) */}
+
+        {/* Organization (Optional) */}
         <div className="relative">
           <FaBuilding
             className="absolute left-4 top-1/2 -translate-y-1/2"
-           style={{ color: COLORS.ocean }}
+            style={{ color: COLORS.ocean }}
           />
 
           <input
@@ -160,27 +168,6 @@ export default function RegisterPage() {
             onChange={(e) => setOrganization(e.target.value)}
             className="w-full rounded-xl border py-3.5 pl-12 pr-4 bg-slate-50 border-slate-200 transition-all duration-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none"
           />
-        </div>
-
-        {/* Role */}
-        <div className="relative">
-          <FaUserTag
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
-            style={{ color: COLORS.ocean }}
-          />
-
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full appearance-none rounded-xl border py-3.5 pl-12 pr-4 bg-slate-50 border-slate-200 transition-all duration-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none"
-            style={{ color: COLORS.body }}
-          >
-            <option value="">Select Role</option>
-            <option value="Content Creator">Content Creator</option>
-            <option value="Marketing Team">Marketing Team</option>
-            <option value="Business User">Business User</option>
-            <option value="Administrator">Administrator</option>
-          </select>
         </div>
 
         <div onClick={handleRegister}>
@@ -203,6 +190,7 @@ export default function RegisterPage() {
             Login
           </Link>
         </p>
+
       </div>
     </AuthLayout>
   );
