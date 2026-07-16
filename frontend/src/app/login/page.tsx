@@ -25,6 +25,7 @@ export default function LoginPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -35,13 +36,19 @@ export default function LoginPage() {
     setEmailError("");
     setPasswordError("");
 
-    if (!email) {
+    if (!email.trim()) {
       setEmailError("Email is required");
       valid = false;
+    } else if (email !== email.toLowerCase()) {
+      setEmailError("Email should not contain uppercase letters");
+      valid = false;
+    } else if (email.includes(" ")) {
+      setEmailError("Email should not contain spaces");
+      valid = false;
     } else if (
-      !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)
+      !/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)
     ) {
-      setEmailError("Please enter a valid email");
+      setEmailError("Enter a valid email address");
       valid = false;
     }
 
@@ -63,6 +70,10 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+
+      // You can later use rememberMe for authentication logic
+      console.log("Remember Me:", rememberMe);
+
       router.push("/dashboard");
     } catch (err) {
       setPasswordError(
@@ -72,7 +83,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
   return (
     <AuthLayout
       title="Welcome Back!"

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import authService from "@/lib/authService";
+
 import {
   FaEnvelope,
   FaLock,
@@ -26,34 +27,61 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [organization, setOrganization] = useState("");
 
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+
   const [loading, setLoading] = useState(false);
+
   const router = useRouter();
 
   const handleRegister = async () => {
-    if (!name) {
-      alert("Full Name is required");
-      return;
+    let valid = true;
+
+    setNameError("");
+    setEmailError("");
+    setPasswordError("");
+    setConfirmPasswordError("");
+
+    if (!name.trim()) {
+      setNameError("Full Name is required");
+      valid = false;
     }
 
-    if (!email) {
-      alert("Email is required");
-      return;
+    if (!email.trim()) {
+      setEmailError("Email is required");
+      valid = false;
+    } else if (email !== email.toLowerCase()) {
+      setEmailError("Email should not contain uppercase letters");
+      valid = false;
+    } else if (email.includes(" ")) {
+      setEmailError("Email should not contain spaces");
+      valid = false;
+    } else if (
+      !/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)
+    ) {
+      setEmailError("Enter a valid email address");
+      valid = false;
     }
 
     if (!password) {
-      alert("Password is required");
-      return;
+      setPasswordError("Password is required");
+      valid = false;
+    } else if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      valid = false;
     }
 
     if (!confirmPassword) {
-      alert("Confirm Password is required");
-      return;
+      setConfirmPasswordError("Confirm Password is required");
+      valid = false;
+    } else if (password !== confirmPassword) {
+      setConfirmPasswordError("Passwords do not match");
+      valid = false;
     }
 
-    if (password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
+    if (!valid) return;
 
     setLoading(true);
 
@@ -74,14 +102,15 @@ export default function RegisterPage() {
     }
   };
 
-  return (
-    <AuthLayout
-      title="Create Account"
-      subtitle="Create your account to start your SocialPilot journey."
-    >
-      <div className="space-y-5">
+return (
+  <AuthLayout
+    title="Create Account"
+    subtitle="Create your account to start your SocialPilot journey."
+  >
+    <div className="space-y-5">
 
-        {/* Full Name */}
+      {/* Full Name */}
+      <div>
         <div className="relative">
           <FaUser
             className="absolute left-4 top-1/2 -translate-y-1/2"
@@ -97,7 +126,15 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* Email */}
+        {nameError && (
+          <p className="text-red-500 text-sm mt-1">
+            {nameError}
+          </p>
+        )}
+      </div>
+
+      {/* Email */}
+      <div>
         <div className="relative">
           <FaEnvelope
             className="absolute left-4 top-1/2 -translate-y-1/2"
@@ -113,7 +150,15 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* Password */}
+        {emailError && (
+          <p className="text-red-500 text-sm mt-1">
+            {emailError}
+          </p>
+        )}
+      </div>
+
+      {/* Password */}
+      <div>
         <div className="relative">
           <FaLock
             className="absolute left-4 top-1/2 -translate-y-1/2"
@@ -138,7 +183,15 @@ export default function RegisterPage() {
           </button>
         </div>
 
-        {/* Confirm Password */}
+        {passwordError && (
+          <p className="text-red-500 text-sm mt-1">
+            {passwordError}
+          </p>
+        )}
+      </div>
+
+      {/* Confirm Password */}
+      <div>
         <div className="relative">
           <FaLock
             className="absolute left-4 top-1/2 -translate-y-1/2"
@@ -154,44 +207,51 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* Organization (Optional) */}
-        <div className="relative">
-          <FaBuilding
-            className="absolute left-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLORS.ocean }}
-          />
-
-          <input
-            type="text"
-            placeholder="Organization (Optional)"
-            value={organization}
-            onChange={(e) => setOrganization(e.target.value)}
-            className="w-full rounded-xl border py-3.5 pl-12 pr-4 bg-slate-50 border-slate-200 transition-all duration-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none"
-          />
-        </div>
-
-        <div onClick={handleRegister}>
-          <Button
-            text="Create Account"
-            loading={loading}
-          />
-        </div>
-
-        <p
-          className="text-center"
-          style={{ color: COLORS.body }}
-        >
-          Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-semibold hover:underline"
-            style={{ color: COLORS.primary }}
-          >
-            Login
-          </Link>
-        </p>
-
+        {confirmPasswordError && (
+          <p className="text-red-500 text-sm mt-1">
+            {confirmPasswordError}
+          </p>
+        )}
       </div>
-    </AuthLayout>
-  );
+
+      {/* Organization */}
+      <div className="relative">
+        <FaBuilding
+          className="absolute left-4 top-1/2 -translate-y-1/2"
+          style={{ color: COLORS.ocean }}
+        />
+
+        <input
+          type="text"
+          placeholder="Organization (Optional)"
+          value={organization}
+          onChange={(e) => setOrganization(e.target.value)}
+          className="w-full rounded-xl border py-3.5 pl-12 pr-4 bg-slate-50 border-slate-200 transition-all duration-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none"
+        />
+      </div>
+
+      <div onClick={handleRegister}>
+        <Button
+          text="Create Account"
+          loading={loading}
+        />
+      </div>
+
+      <p
+        className="text-center"
+        style={{ color: COLORS.body }}
+      >
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-semibold hover:underline"
+          style={{ color: COLORS.primary }}
+        >
+          Login
+        </Link>
+      </p>
+
+    </div>
+  </AuthLayout>
+);
 }
