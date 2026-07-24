@@ -11,17 +11,13 @@ interface Stat {
   icon: LucideIcon;
   trend: string;
   trendUp: boolean;
+  badge?: string;
+  description?: string;
   color: "ocean" | "teal" | "amber" | "emerald";
-  variant: "filled" | "light";
   roles: Role[];
 }
 
-const allRoles: Role[] = [
-  "content_creator",
-  "marketing_team",
-  "business_user",
-  "administrator",
-];
+const allRoles: Role[] = ["content_creator", "marketing_team", "business_user", "administrator"];
 
 const stats: Stat[] = [
   {
@@ -30,8 +26,9 @@ const stats: Stat[] = [
     icon: FileText,
     trend: "12.4% this week",
     trendUp: true,
+    badge: "Good",
+    description: "Across all connected platforms this month.",
     color: "ocean",
-    variant: "filled",
     roles: allRoles,
   },
   {
@@ -40,18 +37,19 @@ const stats: Stat[] = [
     icon: Link2,
     trend: "2 new",
     trendUp: true,
+    badge: "Active",
+    description: "Facebook, YouTube and 3 others linked.",
     color: "teal",
-    variant: "light",
     roles: allRoles,
   },
   {
     title: "Campaigns",
     value: "12",
     icon: Megaphone,
-    trend: "3.1%",
+    trend: "3.1% this month",
     trendUp: false,
+    description: "4 running, 8 completed.",
     color: "amber",
-    variant: "light",
     roles: ["marketing_team", "business_user", "administrator"],
   },
   {
@@ -60,8 +58,9 @@ const stats: Stat[] = [
     icon: TrendingUp,
     trend: "18.9% this month",
     trendUp: true,
+    badge: "Growing",
+    description: "Total impressions across all posts.",
     color: "emerald",
-    variant: "light",
     roles: ["marketing_team", "business_user", "administrator"],
   },
 ];
@@ -71,7 +70,7 @@ export default function DashboardStats() {
   const visibleStats = stats.filter((stat) => stat.roles.includes(role));
 
   return (
-    <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {visibleStats.map((stat) => (
         <StatCard key={stat.title} {...stat} />
       ))}

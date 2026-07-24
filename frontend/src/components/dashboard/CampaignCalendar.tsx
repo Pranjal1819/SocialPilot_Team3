@@ -67,9 +67,9 @@ export default function CampaignCalendar() {
   ];
 
   return (
-    <div className="mt-8 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_22px_-12px_rgba(15,23,42,0.12)]">
+    <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-md transition-all duration-300 hover:shadow-xl">
       {/* Header band */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-[#0096C7] to-[#0077B6] px-6 py-5">
+      <div className="flex flex-col gap-4 bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 text-white">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
             <CalendarDays size={18} />
@@ -100,7 +100,7 @@ export default function CampaignCalendar() {
         </button>
       </div>
 
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         {/* Add event form */}
         {showForm && (
           <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50/50 p-5">
@@ -188,7 +188,7 @@ export default function CampaignCalendar() {
             return (
               <div
                 key={cellISO}
-                className={`min-h-[70px] rounded-xl border p-2 transition-colors ${
+                className={`min-h-[76px] rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm sm:min-h-[88px] ${
                   isToday
                     ? "border-[#0096C7] bg-[#EAF8FC] ring-2 ring-[#CAF0F8]"
                     : isWeekend
@@ -225,6 +225,6 @@ export default function CampaignCalendar() {
           })}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

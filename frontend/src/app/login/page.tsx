@@ -164,7 +164,7 @@ export default function LoginPage() {
           className="text-center"
           style={{ color: COLORS.text }}
         >
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link
             href="/register"
             className="font-semibold hover:underline"

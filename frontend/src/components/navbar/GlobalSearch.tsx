@@ -44,8 +44,8 @@ export default function GlobalSearch() {
 
   return (
     <div className="relative flex-1 max-w-md" ref={ref}>
-      <div className="flex items-center gap-3 rounded-xl border border-[#ADE8F4]/60 bg-white px-4 py-3.5 transition-all duration-200 ease-in-out focus-within:border-[#0096C7] focus-within:ring-4 focus-within:ring-[#CAF0F8]">
-        <Search size={18} className="text-slate-400 shrink-0" />
+     <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 transition-all duration-150 ease-in-out focus-within:border-slate-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-slate-100">
+        <Search size={16} className="text-slate-400 shrink-0" />
         <input
           type="text"
           value={query}
@@ -57,6 +57,9 @@ export default function GlobalSearch() {
           placeholder="Search pages or platforms..."
           className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none"
         />
+        <kbd className="hidden sm:inline-flex shrink-0 items-center gap-0.5 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+          ⌘/
+        </kbd>
       </div>
 
       {isOpen && q && (

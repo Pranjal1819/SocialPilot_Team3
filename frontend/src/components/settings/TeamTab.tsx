@@ -19,10 +19,10 @@ const teamMembers: TeamMember[] = [
 
 export default function TeamTab() {
   return (
-    <div className="max-w-3xl rounded-2xl border border-slate-100 bg-white p-8 shadow-[0_8px_22px_-12px_rgba(15,23,42,0.1)]">
-      <div className="flex items-center justify-between mb-7">
+    <div className="max-w-3xl rounded-2xl border border-slate-100 bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl sm:p-7">
+      <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-base font-semibold text-slate-800">{teamMembers.length} team members</p>
-        <button className="flex items-center gap-2 rounded-lg bg-[#0077B6] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#00618f] transition-colors">
+        <button className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0077B6] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#00618f]">
           <UserPlus size={16} />
           Invite member
         </button>

@@ -1,3 +1,4 @@
+import { CalendarClock, Users, UserRound } from "lucide-react";
 import {
   LayoutDashboard,
   Link2,
@@ -38,9 +39,17 @@ export const navigation: NavItem[] = [
     icon: Megaphone,
     roles: ["marketing_team", "business_user", "administrator"],
   },
+  {
+    title: "Content Scheduling",
+    href: "/content-scheduling",
+    icon: CalendarClock,
+    roles: ["content_creator", "marketing_team", "administrator"],
+  },
+  { title: "Users", href: "/users", icon: Users, roles: ["administrator"] },
 ];
 
 export const secondaryNavigation: NavItem[] = [
+  { title: "Profile", href: "/profile", icon: UserRound, roles: allRoles },
   { title: "Help & Support", href: "/help", icon: HelpCircle, roles: allRoles },
   { title: "Settings", href: "/settings", icon: Settings, roles: allRoles },
 ];

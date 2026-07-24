@@ -2,7 +2,7 @@
 
 :root {
   --color-primary: #2563EB;
-  --color-secondary: #0F766E;
+  --color-secondary: #06B6D4;
   --color-accent: #99F6E4;
 
   --color-background: #F8FAFC;
@@ -26,4 +26,10 @@ body {
   background: var(--color-background);
   color: var(--color-text);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select {
+  font: inherit;
 }

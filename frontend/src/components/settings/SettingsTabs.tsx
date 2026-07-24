@@ -19,7 +19,7 @@ export default function SettingsTabs() {
 
   return (
     <div>
-      <div className="flex gap-6 mb-8 border-b border-slate-100 pb-0">
+      <div className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-100 bg-white p-2 shadow-md">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = active === tab.key;
@@ -27,10 +27,10 @@ export default function SettingsTabs() {
             <button
               key={tab.key}
               onClick={() => setActive(tab.key)}
-              className={`flex items-center gap-2 px-2 py-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300 ${
                 isActive
-                  ? "border-[#0077B6] text-[#0077B6]"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-sky-50 text-[#0077B6]"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
               }`}
             >
               <Icon size={17} />
@@ -40,9 +40,9 @@ export default function SettingsTabs() {
         })}
       </div>
 
-      {active === "profile" && <ProfileTab />}
+      <div className="mt-6">{active === "profile" && <ProfileTab />}
       {active === "account" && <AccountTab />}
-      {active === "team" && <TeamTab />}
+      {active === "team" && <TeamTab />}</div>
     </div>
   );
 }

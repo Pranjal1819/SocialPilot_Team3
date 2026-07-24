@@ -27,9 +27,9 @@ export default function AccountTab() {
   ];
 
   return (
-    <div className="max-w-3xl rounded-2xl border border-slate-100 bg-white p-8 shadow-[0_8px_22px_-12px_rgba(15,23,42,0.1)] divide-y divide-slate-100">
+    <div className="max-w-3xl divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl sm:p-7">
       {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between gap-6 py-5 first:pt-0 last:pb-0">
+        <div key={row.label} className="flex items-center justify-between gap-6 py-6 first:pt-0 last:pb-0">
           <div className="min-w-0">
             <p className="text-base font-medium text-slate-900">{row.label}</p>
             <p className="text-sm text-slate-400 mt-1">{row.desc}</p>
