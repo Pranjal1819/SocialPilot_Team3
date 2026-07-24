@@ -17,57 +17,36 @@ class User(Base):
 
     name = Column(String(100), nullable=False)
 
-    email = Column(
-        String(200),
-        unique=True,
-        nullable=False,
-        index=True
-    )
+    email = Column(String(200), unique=True, nullable=False, index=True)
 
-    password = Column(
-        String(255),
-        nullable=True
-    )
-    linkedin_id = Column(
-        String(255),
-        unique=True,
-        nullable=True
-        
-    )
-    role = Column(
-        String(50),
-        default="user"
-    )
+    password = Column(String(255), nullable=True)
 
-    profile_picture = Column(
-        String(500),
-        nullable=True
-    )
+    linkedin_id = Column(String(255), unique=True, nullable=True)
 
-    is_active = Column(
-        Boolean,
-        default=True
-    )
+    role = Column(String(50), default="user")
 
-    created_at = Column(
-        DateTime,
-        default=func.now()
-    )
+    profile_picture = Column(String(500), nullable=True)
+
+    is_active = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=func.now())
+
+    # -------------------------
+    # Relationships
+    # -------------------------
 
     campaigns = relationship(
-        "Campaign",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "Campaign", back_populates="user", cascade="all, delete-orphan"
     )
 
     scheduled_posts = relationship(
-        "ScheduledPost",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "ScheduledPost", back_populates="user", cascade="all, delete-orphan"
     )
 
     social_accounts = relationship(
-        "SocialAccount",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "SocialAccount", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    notifications = relationship(
+        "Notification", back_populates="user", cascade="all, delete-orphan"
     )

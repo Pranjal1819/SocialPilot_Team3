@@ -11,11 +11,7 @@ class Campaign(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=False
-    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     name = Column(String(200), nullable=False)
 
@@ -27,23 +23,13 @@ class Campaign(Base):
 
     end_date = Column(DateTime, nullable=False)
 
-    status = Column(
-        String(50),
-        default="active"
-    )
+    status = Column(String(50), default="active")
 
-    created_at = Column(
-        DateTime,
-        default=func.now()
-    )
+    created_at = Column(DateTime, default=func.now())
 
-    user = relationship(
-        "User",
-        back_populates="campaigns"
-    )
+    user = relationship("User", back_populates="campaigns")
+    scheduled_posts = relationship("ScheduledPost", back_populates="campaign")
 
     analytics = relationship(
-        "PostAnalytics",
-        back_populates="campaign",
-        cascade="all, delete-orphan"
+        "PostAnalytics", back_populates="campaign", cascade="all, delete-orphan"
     )
