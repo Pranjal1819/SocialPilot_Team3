@@ -1,5 +1,6 @@
 import ProgressBar from "./ProgressBar";
 import { Campaign } from "@/types/campaign";
+import Link from "next/link";
 import {
   FaRupeeSign,
   FaCalendarAlt,
@@ -111,23 +112,24 @@ export default function CampaignCard({ campaign }: CampaignCardProps) {
       <ProgressBar value={campaign.progress} />
 
       {/* Buttons */}
-      <div className="mt-6 flex gap-3">
+   <div className="mt-6 flex gap-3">
 
-        <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-medium text-white transition hover:shadow-lg">
-
-          <FaEye />
-          View Details
-
-        </button>
-
-        <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-200">
-
-          <FaEdit />
-          Edit
-
-        </button>
-
-      </div>
+<Link
+  href={`/campaign/${campaign.id}`}
+  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-medium text-white hover:shadow-lg"
+>
+  <FaEye />
+  View Details
+</Link>
+<Link
+  href={`/campaign/${campaign.id}/edit`}
+  onClick={() => console.log(`/campaign/${campaign.id}/edit`)}
+  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-3 font-medium text-gray-700 hover:bg-gray-200"
+>
+  <FaEdit />
+  Edit
+</Link>
+</div>
 
     </div>
   );

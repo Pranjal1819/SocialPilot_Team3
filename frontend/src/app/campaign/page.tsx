@@ -7,6 +7,7 @@ import SearchBar from "@/components/campaign/SearchBar";
 import CampaignFilter from "@/components/campaign/CampaignFilter";
 import CampaignCard from "@/components/campaign/CampaignCard";
 import CampaignStats from "@/components/campaign/CampaignStats";
+import DashboardLayout from "@/components/DashboardLayout";
 
 import { mockCampaigns } from "@/lib/mockCampaigns";
 
@@ -24,19 +25,24 @@ export default function CampaignDashboard() {
 
     return matchesSearch && matchesStatus;
   });
+return (
 
-  return (
-    <main className="min-h-screen bg-gray-100 p-8">
+  <DashboardLayout>
+
+    <main className="bg-gray-100 p-8">
 
       {/* Heading */}
+
       <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
 
         <div>
+
           <h1 className="text-4xl font-bold text-slate-900">
             Campaign Management
           </h1>
 
           <div className="mt-2 h-1 w-24 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500"></div>
+
         </div>
 
         <Link
@@ -49,9 +55,11 @@ export default function CampaignDashboard() {
       </div>
 
       {/* Dashboard Statistics */}
+
       <CampaignStats />
 
       {/* Search & Filter */}
+
       <div className="mb-8 flex flex-col gap-4 md:flex-row">
 
         <SearchBar
@@ -67,6 +75,7 @@ export default function CampaignDashboard() {
       </div>
 
       {/* Campaign Cards */}
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
         {filteredCampaigns.map((campaign) => (
@@ -79,5 +88,8 @@ export default function CampaignDashboard() {
       </div>
 
     </main>
-  );
+
+  </DashboardLayout>
+
+);
 }
