@@ -25,15 +25,37 @@ const validRoles: Role[] = [
 ];
 
 /**
- * Backend confirmed it returns exact role strings matching our Role type.
- * New users default to "user" (not yet assigned a real role by an admin) —
- * we map that specific case to "content_creator" as a safe default until
- * an admin assigns their real role via PATCH /api/users/{id}/role.
+ * Maps backend role values to frontend roles.
+ *
+ * Backend may return:
+ * - "admin"
+ * - "business_user"
+ * - "marketing_team"
+ * - "content_creator"
+ * - "user" (default for newly registered users)
+ *
+ * Frontend uses:
+ * - "administrator"
+ * - "business_user"
+ * - "marketing_team"
+ * - "content_creator"
  */
 export function mapBackendRole(backendRole: string): Role {
+  // Backend returns "admin", frontend uses "administrator"
+  if (backendRole === "admin") {
+    return "administrator";
+  }
+
+  // Matching role names
   if (validRoles.includes(backendRole as Role)) {
     return backendRole as Role;
   }
-  // Covers the "user" default for newly registered, not-yet-assigned accounts
+
+  // Default backend role for newly registered users
+  if (backendRole === "user") {
+    return "content_creator";
+  }
+
+  // Safe fallback for unknown roles
   return "content_creator";
 }
