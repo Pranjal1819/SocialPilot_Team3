@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   FaArrowLeft,
   FaBullhorn,
@@ -65,9 +66,9 @@ export default function CampaignDetailsPage() {
     "Campaign Ends",
   ];
 
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-8">
-
+return (
+  <DashboardLayout>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50"></div>
       <div className="mx-auto max-w-7xl">
 
         <button
@@ -460,10 +461,10 @@ export default function CampaignDetailsPage() {
 
 
         </div>
-        id="part4"
+      
       </div>
 
-    </main>
+    </DashboardLayout>
   );
 }
 

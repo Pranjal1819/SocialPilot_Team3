@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   FaArrowLeft,
   FaCheckCircle,
@@ -69,11 +69,11 @@ const platformStats = [
 const campaignProgress = 72;
 
   return (
+  <DashboardLayout>
 
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
 
-
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-6xl"></div>
 
 
         {/* Header */}
@@ -372,7 +372,7 @@ const campaignProgress = 72;
       </div>
 
 
-    </main>
+    </DashboardLayout>
 
   );
 

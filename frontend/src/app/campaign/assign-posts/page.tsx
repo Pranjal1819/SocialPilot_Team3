@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   FaTasks,
   FaCheckCircle,
@@ -141,13 +142,11 @@ function handleAssign(){
 
 
 
-  return (
+return (
+  <DashboardLayout>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
 
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-8">
-
-
-      <div className="mx-auto max-w-6xl">
-
+      <div className="mx-auto max-w-6xl"></div>
 
         <div className="mb-8">
 
@@ -452,7 +451,7 @@ selectedPosts.length===0
       </div>
 
 
-    </main>
+    </DashboardLayout>
 
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import DashboardLayout from "@/components/DashboardLayout";
 
 import {
   FaBullhorn,
@@ -73,11 +74,11 @@ export default function CampaignTimelinePage() {
 
 
   return (
+  <DashboardLayout>
 
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
 
-
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl"></div>
 
 
         {/* Heading */}
@@ -312,7 +313,7 @@ width:"72%"
       </div>
 
 
-    </main>
+   </DashboardLayout>
 
   );
 }
