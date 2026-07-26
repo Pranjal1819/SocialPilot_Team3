@@ -1,682 +1,382 @@
-import Link from "next/link";
-import Image from "next/image";
+"use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import {
-  FaCalendarAlt,
   FaChartLine,
-  FaUsers,
-  FaFacebook,
-  FaInstagram,
-  FaLinkedin,
-  FaPinterest,
-  FaYoutube,
-  FaCheckCircle,
+  FaCalendarAlt,
+  FaBullhorn,
+  FaArrowRight,
 } from "react-icons/fa";
 
-import { FaXTwitter } from "react-icons/fa6";
-
-import { COLORS } from "@/constants/theme";
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <main
-      className="min-h-screen"
-      style={{
-        background:
-          "linear-gradient(to bottom,#F8FAFC 0%,#EDF7FF 100%)",
-      }}
-    >
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
 
-      {/* ================= HEADER ================= */}
+      {/* ================= NAVBAR ================= */}
 
-      <header className="max-w-7xl mx-auto px-8 py-6 flex justify-between items-center">
+      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
 
-        <h2
-          className="text-3xl font-bold tracking-tight"
-          style={{ color: COLORS.primary }}
-        >
-          SocialPilot
-        </h2>
+          <div className="flex items-center gap-3">
 
-        <nav className="flex items-center gap-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-xl font-bold text-white shadow-lg">
+              S
+            </div>
 
-          <Link
-            href="/"
-            className="font-medium hover:text-sky-700 transition"
-            style={{ color: COLORS.body }}
-          >
-            Home
-          </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                SocialPilot
+              </h1>
 
-          <Link
-            href="/login"
-            className="font-medium hover:text-sky-700 transition"
-            style={{ color: COLORS.body }}
-          >
-            Login
-          </Link>
+              <p className="text-xs text-slate-500">
+                Social Media Management
+              </p>
+            </div>
 
-          <Link
-            href="/register"
-            className="px-6 py-2 rounded-full text-white font-semibold transition-all duration-300 hover:scale-105"
-            style={{
-              background:
-                "linear-gradient(135deg,#0096C7,#0077B6)",
-            }}
-          >
-            Register
-          </Link>
-
-        </nav>
-
-      </header>
-
-      {/* ================= HERO ================= */}
-
-      <section className="relative overflow-hidden">
-
-        <div
-          className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-3xl opacity-20"
-          style={{ background: COLORS.ocean }}
-        />
-
-        <div
-          className="absolute top-10 right-0 w-96 h-96 rounded-full blur-3xl opacity-10"
-          style={{ background: COLORS.primary }}
-        />
-
-        <div className="max-w-7xl mx-auto px-6 py-20 text-center relative">
-
-          <div
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-full mb-8"
-            style={{
-              background: "#EAF6FF",
-              color: COLORS.primary,
-            }}
-          >
-            <FaCheckCircle />
-            Trusted by 10,000+ marketers
           </div>
 
-          <h1
-            className="text-6xl md:text-7xl font-extrabold leading-tight"
-            style={{
-              color: COLORS.text,
-            }}
-          >
-            Manage all your
+          <div className="hidden items-center gap-10 font-medium text-slate-600 md:flex">
+            <a href="#features" className="transition hover:text-blue-600">
+              Features
+            </a>
 
-            <br />
+            <a href="#about" className="transition hover:text-blue-600">
+              About
+            </a>
 
-            <span style={{ color: COLORS.primary }}>
-              Social Media
-            </span>
+            <a href="#contact" className="transition hover:text-blue-600">
+              Contact
+            </a>
+          </div>
 
-            <br />
+          <div className="flex items-center gap-4">
 
-            Like a Pro
-          </h1>
-
-          <p
-            className="max-w-3xl mx-auto mt-8 text-xl leading-9"
-            style={{
-              color: COLORS.body,
-            }}
-          >
-            Plan, publish, schedule and analyze content across
-            Facebook, Instagram, LinkedIn, X, Pinterest and
-            YouTube from one beautiful dashboard.
-          </p>
-
-          <div className="flex justify-center gap-5 mt-10">
+            <Link
+              href="/login"
+              className="rounded-xl border border-slate-300 px-5 py-2 font-semibold text-slate-700 transition hover:border-blue-600 hover:text-blue-600"
+            >
+              Login
+            </Link>
 
             <Link
               href="/register"
-              className="px-8 py-4 rounded-xl text-white font-semibold transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl"
-              style={{
-                background:
-                  "linear-gradient(135deg,#0096C7,#0077B6)",
-              }}
+              className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-2 font-semibold text-white shadow-lg transition hover:scale-105"
             >
-              Get Started →
+              Register
             </Link>
 
           </div>
 
-          {/* Social Apps */}
+        </div>
+      </nav>
 
-          <div className="flex justify-center gap-8 mt-14 text-4xl">
+      {/* ================= HERO ================= */}
 
-            <FaFacebook
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#1877F2" }}
-            />
+      <section className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-16 px-8 py-20 lg:flex-row">
 
-            <FaInstagram
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#E1306C" }}
-            />
+        <div className="max-w-2xl">
 
-            <FaLinkedin
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#0A66C2" }}
-            />
+          <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
+            🚀 AI Powered Social Media Platform
+          </span>
 
-            <FaXTwitter
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#111827" }}
-            />
+          <h1 className="mt-8 text-6xl font-extrabold leading-tight text-slate-900">
+            Manage Your
+            <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+              {" "}Social Media
+            </span>
+            <br />
+            Smarter.
+          </h1>
 
-            <FaPinterest
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#E60023" }}
-            />
+          <p className="mt-8 text-xl leading-9 text-slate-600">
+            Plan campaigns, schedule posts, collaborate with your team,
+            monitor performance and manage all your social media platforms
+            from one intelligent dashboard.
+          </p>
 
-            <FaYoutube
-              className="hover:scale-125 transition-all duration-300 cursor-pointer"
-              style={{ color: "#FF0000" }}
-            />
+          <div className="mt-10 flex flex-wrap gap-5">
+
+            <Link
+              href="/register"
+              className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-8 py-4 text-lg font-semibold text-white shadow-xl transition hover:scale-105"
+            >
+              Get Started
+              <FaArrowRight />
+            </Link>
+
+            <Link
+              href="/login"
+              className="rounded-xl border-2 border-slate-300 px-8 py-4 text-lg font-semibold text-slate-700 transition hover:border-blue-600 hover:text-blue-600"
+            >
+              Login
+            </Link>
 
           </div>
 
-          
+          <div className="mt-14 flex gap-10">
 
-      {/* 3D Phone Preview */}
+            <div>
+              <h2 className="text-4xl font-bold text-blue-600">
+                10K+
+              </h2>
 
-<div className="mt-16 flex justify-center relative">
+              <p className="text-slate-600">
+                Campaigns Managed
+              </p>
+            </div>
 
-  {/* Floating Card 1 */}
-  <div className="absolute top-10 left-10 bg-white rounded-2xl shadow-xl px-4 py-3 hidden md:block">
-    <p className="text-xs text-gray-500">Scheduled</p>
-    <p className="font-bold">24 Posts</p>
-  </div>
+            <div>
+              <h2 className="text-4xl font-bold text-cyan-600">
+                99%
+              </h2>
 
-  {/* Floating Card 2 */}
-  <div className="absolute top-24 right-10 bg-white rounded-2xl shadow-xl px-4 py-3 hidden md:block">
-    <p className="text-xs text-gray-500">Engagement</p>
-    <p className="font-bold text-green-500">+38%</p>
-  </div>
+              <p className="text-slate-600">
+                User Satisfaction
+              </p>
+            </div>
 
-  {/* Floating Card 3 */}
-  <div className="absolute bottom-10 left-12 bg-white rounded-2xl shadow-xl px-4 py-3 hidden md:block">
-    <p className="text-xs text-gray-500">Followers</p>
-    <p className="font-bold">12.4K</p>
-  </div>
+            <div>
+              <h2 className="text-4xl font-bold text-indigo-600">
+                24/7
+              </h2>
 
-  <Image
-    src="/images/3d-phone.png"
-    alt="SocialPilot Mobile App"
-    width={450}
-    height={450}
-    className="drop-shadow-2xl hover:scale-105 transition-all duration-500"
-  />
+              <p className="text-slate-600">
+                Cloud Access
+              </p>
+            </div>
 
-</div>
+          </div>
+
+        </div>
+                {/* Right Side - Phone Image */}
+
+        <div className="relative flex justify-center">
+
+          {/* Glow Effect */}
+          <div className="absolute -z-10 h-[450px] w-[450px] rounded-full bg-gradient-to-r from-cyan-300 via-blue-300 to-indigo-300 opacity-30 blur-3xl"></div>
+
+          <Image
+            src="/images/3d-phone.png"
+            alt="SocialPilot Dashboard"
+            width={520}
+            height={620}
+            priority
+            className="drop-shadow-2xl transition duration-500 hover:scale-105"
+          />
 
         </div>
 
       </section>
 
-      
-            {/* ================= Statistics ================= */}
+      {/* ================= FEATURES ================= */}
 
-     {/* ================= Statistics ================= */}
-
-<section className="max-w-6xl mx-auto px-6 -mt-6 mb-24">
-
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-
-    {[
-      ["100K+", "Posts Scheduled"],
-      ["15K+", "Happy Users"],
-      ["99.9%", "Uptime"],
-      ["24/7", "Support"],
-    ].map(([value, label]) => (
-
-      <div
-        key={label}
-        className="rounded-3xl p-7 text-center transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid #D6ECFF",
-        }}
+      <section
+        id="features"
+        className="bg-white py-24"
       >
 
-        <h2
-          className="text-4xl font-extrabold"
-          style={{ color: COLORS.primary }}
-        >
-          {value}
-        </h2>
-
-        <p
-          className="mt-3"
-          style={{ color: COLORS.body }}
-        >
-          {label}
-        </p>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</section>
-
-{/* ================= FEATURES ================= */}
-
-<section className="max-w-7xl mx-auto px-6 pb-28">
-
-  <h2
-    className="text-5xl font-bold text-center mb-5"
-    style={{ color: COLORS.text }}
-  >
-    Everything you need
-  </h2>
-
-  <p
-    className="text-center text-lg mb-16 max-w-3xl mx-auto"
-    style={{ color: COLORS.body }}
-  >
-    Powerful tools to schedule, manage and grow your social presence
-    from one beautiful dashboard.
-  </p>
-
-  <div className="grid md:grid-cols-3 gap-8">
-
-    {/* Card 1 */}
-
-    <div
-      className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid #D6ECFF",
-      }}
-    >
-
-      <FaCalendarAlt
-        size={48}
-        style={{ color: COLORS.primary }}
-      />
-
-      <h3
-        className="text-2xl font-bold mt-6 mb-4"
-        style={{ color: COLORS.primary }}
-      >
-        Schedule Posts
-      </h3>
-
-      <p
-        className="leading-8"
-        style={{ color: COLORS.body }}
-      >
-        Publish content automatically across all major social media
-        platforms without switching between apps.
-      </p>
-
-    </div>
-
-    {/* Card 2 */}
-
-    <div
-      className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid #D6ECFF",
-      }}
-    >
-
-      <FaChartLine
-        size={48}
-        style={{ color: COLORS.primary }}
-      />
-
-      <h3
-        className="text-2xl font-bold mt-6 mb-4"
-        style={{ color: COLORS.primary }}
-      >
-        Smart Analytics
-      </h3>
-
-      <p
-        className="leading-8"
-        style={{ color: COLORS.body }}
-      >
-        Understand audience engagement, impressions and campaign
-        performance using beautiful visual reports.
-      </p>
-
-    </div>
-
-    {/* Card 3 */}
-
-    <div
-      className="rounded-3xl p-8 transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid #D6ECFF",
-      }}
-    >
-
-      <FaUsers
-        size={48}
-        style={{ color: COLORS.primary }}
-      />
-
-      <h3
-        className="text-2xl font-bold mt-6 mb-4"
-        style={{ color: COLORS.primary }}
-      >
-        Team Collaboration
-      </h3>
-
-      <p
-        className="leading-8"
-        style={{ color: COLORS.body }}
-      >
-        Invite team members, assign roles and collaborate together
-        without leaving the platform.
-      </p>
-
-    </div>
-
-  </div>
-
-</section>
-
-{/* ================= CALL TO ACTION ================= */}
-            
-{/* ================= CALL TO ACTION ================= */}
-
-<section className="py-24 px-6">
-
-  <div
-    className="max-w-6xl mx-auto rounded-[40px] p-14 text-center"
-    style={{
-      background: "#FFFFFF",
-      border: "1px solid #D6ECFF",
-      boxShadow: "0 25px 60px rgba(37,99,235,0.10)",
-    }}
-  >
-
-    <div className="text-6xl mb-6">
-      🚀
-    </div>
-
-    <h2
-      className="text-5xl font-bold mb-6"
-      style={{
-        color: COLORS.text,
-      }}
-    >
-      Ready to Grow Your Brand?
-    </h2>
-
-    <p
-      className="text-lg leading-8 max-w-3xl mx-auto"
-      style={{
-        color: COLORS.body,
-      }}
-    >
-      Schedule smarter, publish faster and monitor your social media
-      performance from one beautiful platform.
-    </p>
-
-    <div className="flex justify-center gap-5 mt-10 flex-wrap">
-
-      <Link
-        href="/register"
-        className="px-8 py-4 rounded-xl text-white font-semibold transition-all duration-300 hover:scale-105 hover:-translate-y-1"
-        style={{
-          background:
-            "linear-gradient(135deg,#0096C7,#0077B6)",
-        }}
-      >
-        Get Started Free
-      </Link>
-
-      <Link
-        href="/login"
-        className="px-8 py-4 rounded-xl font-semibold transition-all duration-300 hover:bg-slate-100"
-        style={{
-          border: "2px solid #0096C7",
-          color: COLORS.primary,
-        }}
-      >
-        Login
-      </Link>
-
-    </div>
-
-    {/* Features */}
-
-    <div className="grid md:grid-cols-3 gap-8 mt-14">
-
-      <div>
-        <h3
-          className="text-3xl font-bold"
-          style={{ color: COLORS.primary }}
-        >
-          ⚡ Fast
-        </h3>
-
-        <p
-          className="mt-3"
-          style={{ color: COLORS.body }}
-        >
-          Schedule posts in seconds.
-        </p>
-      </div>
-
-      <div>
-        <h3
-          className="text-3xl font-bold"
-          style={{ color: COLORS.primary }}
-        >
-          📊 Smart
-        </h3>
-
-        <p
-          className="mt-3"
-          style={{ color: COLORS.body }}
-        >
-          Powerful analytics and insights.
-        </p>
-      </div>
-
-      <div>
-        <h3
-          className="text-3xl font-bold"
-          style={{ color: COLORS.primary }}
-        >
-          👥 Collaborative
-        </h3>
-
-        <p
-          className="mt-3"
-          style={{ color: COLORS.body }}
-        >
-          Work with your entire team easily.
-        </p>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-{/* ================= FOOTER ================= */}
-      
-
-     {/* ================= FOOTER ================= */}
-
-<footer
-  className="pt-20 pb-10 mt-10"
-  style={{
-    background: COLORS.sidebar,
-  }}
->
-  <div className="max-w-7xl mx-auto px-6">
-
-    <div className="grid md:grid-cols-4 gap-10">
-
-      {/* Logo */}
-
-      <div>
-
-        <h2
-          className="text-3xl font-bold text-white"
-        >
-          SocialPilot
-        </h2>
-
-        <p
-          className="mt-5 leading-8"
-          style={{
-            color: "#CBD5E1",
-          }}
-        >
-          Your all-in-one social media management platform.
-          Schedule, publish and analyze your content with ease.
-        </p>
-
-      </div>
-
-      {/* Product */}
-
-      <div>
-
-        <h3 className="text-xl font-semibold text-white mb-5">
-          Product
-        </h3>
-
-        <div className="space-y-3">
-
-          <p className="text-slate-300 hover:text-white cursor-pointer">
-            Features
-          </p>
-
-          <p className="text-slate-300 hover:text-white cursor-pointer">
-            Analytics
-          </p>
-
-          <p className="text-slate-300 hover:text-white cursor-pointer">
-            Scheduling
-          </p>
+        <div className="mx-auto max-w-7xl px-8">
+
+          <div className="mb-16 text-center">
+
+            <span className="rounded-full bg-blue-100 px-4 py-2 font-semibold text-blue-700">
+              Everything You Need
+            </span>
+
+            <h2 className="mt-6 text-5xl font-bold text-slate-900">
+              Powerful Features
+            </h2>
+
+            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-600">
+              SocialPilot helps businesses, marketing teams and content creators
+              streamline campaign planning, post scheduling and analytics from a
+              single dashboard.
+            </p>
+
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-3">
+
+            {/* Card 1 */}
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
+
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 text-2xl text-white">
+                <FaBullhorn />
+              </div>
+
+              <h3 className="mb-4 text-2xl font-bold text-slate-900">
+                Campaign Management
+              </h3>
+
+              <p className="leading-8 text-slate-600">
+                Organize campaigns, manage objectives, budgets, priorities,
+                timelines and monitor campaign progress with ease.
+              </p>
+
+            </div>
+
+            {/* Card 2 */}
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
+
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-500 text-2xl text-white">
+                <FaCalendarAlt />
+              </div>
+
+              <h3 className="mb-4 text-2xl font-bold text-slate-900">
+                Smart Scheduling
+              </h3>
+
+              <p className="leading-8 text-slate-600">
+                Schedule posts across multiple social media platforms with
+                calendar-based planning and campaign assignment.
+              </p>
+
+            </div>
+
+            {/* Card 3 */}
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
+
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 text-2xl text-white">
+                <FaChartLine />
+              </div>
+
+              <h3 className="mb-4 text-2xl font-bold text-slate-900">
+                Analytics Dashboard
+              </h3>
+
+              <p className="leading-8 text-slate-600">
+                Track engagement, reach, impressions, scheduled posts,
+                completion percentage and campaign performance.
+              </p>
+
+            </div>
+
+          </div>
 
         </div>
 
-      </div>
+      </section>
+            {/* ================= ABOUT ================= */}
 
-      {/* Company */}
+      <section
+        id="about"
+        className="bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 py-24"
+      >
+        <div className="mx-auto max-w-6xl px-8 text-center">
 
-      <div>
+          <span className="rounded-full bg-cyan-100 px-4 py-2 font-semibold text-cyan-700">
+            Why SocialPilot?
+          </span>
 
-        <h3 className="text-xl font-semibold text-white mb-5">
-          Company
-        </h3>
+          <h2 className="mt-6 text-5xl font-bold text-slate-900">
+            Simplify Your Marketing Workflow
+          </h2>
 
-        <div className="space-y-3">
+          <p className="mx-auto mt-8 max-w-4xl text-lg leading-9 text-slate-600">
+            Whether you're a business owner, marketing agency or content creator,
+            SocialPilot brings campaign management, post scheduling, analytics,
+            collaboration and reporting together into one intelligent platform.
+            Save time, improve engagement and achieve your marketing goals with
+            confidence.
+          </p>
 
-          <Link
-            href="/"
-            className="block text-slate-300 hover:text-white"
-          >
-            Home
-          </Link>
+        </div>
+      </section>
 
-          <Link
-            href="/login"
-            className="block text-slate-300 hover:text-white"
-          >
-            Login
-          </Link>
+      {/* ================= CALL TO ACTION ================= */}
 
-          <Link
-            href="/register"
-            className="block text-slate-300 hover:text-white"
-          >
-            Register
-          </Link>
+      <section className="py-24">
+
+        <div className="mx-auto max-w-6xl rounded-[40px] bg-gradient-to-r from-blue-600 via-cyan-500 to-sky-500 px-10 py-20 text-center text-white shadow-2xl">
+
+          <h2 className="text-5xl font-bold">
+            Ready to Grow Your Brand?
+          </h2>
+
+          <p className="mx-auto mt-6 max-w-3xl text-lg leading-9 text-blue-100">
+            Join thousands of marketers using SocialPilot to plan campaigns,
+            schedule posts and monitor social media performance from one powerful
+            dashboard.
+          </p>
+
+          <div className="mt-10 flex flex-wrap justify-center gap-5">
+
+            <Link
+              href="/register"
+              className="rounded-xl bg-white px-8 py-4 text-lg font-semibold text-blue-600 transition hover:scale-105"
+            >
+              Create Free Account
+            </Link>
+
+            <Link
+              href="/login"
+              className="rounded-xl border-2 border-white px-8 py-4 text-lg font-semibold text-white transition hover:bg-white hover:text-blue-600"
+            >
+              Login
+            </Link>
+
+          </div>
 
         </div>
 
-      </div>
+      </section>
 
-      {/* Social */}
+      {/* ================= FOOTER ================= */}
 
-      <div>
+      <footer
+        id="contact"
+        className="border-t border-slate-200 bg-white"
+      >
 
-        <h3 className="text-xl font-semibold text-white mb-5">
-          Follow Us
-        </h3>
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-8 py-8 md:flex-row">
 
-        <div className="flex flex-wrap gap-4 text-3xl">
+          <div>
 
-          <FaFacebook
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#1877F2" }}
-          />
+            <h3 className="text-2xl font-bold text-slate-900">
+              SocialPilot
+            </h3>
 
-          <FaInstagram
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#E1306C" }}
-          />
+            <p className="mt-2 text-slate-500">
+              AI Powered Social Media Management Platform
+            </p>
 
-          <FaLinkedin
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#0A66C2" }}
-          />
+          </div>
 
-          <FaXTwitter
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#FFFFFF" }}
-          />
+          <div className="flex gap-8 text-slate-600">
 
-          <FaPinterest
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#E60023" }}
-          />
+            <a href="#features" className="hover:text-blue-600">
+              Features
+            </a>
 
-          <FaYoutube
-            className="cursor-pointer hover:scale-125 transition"
-            style={{ color: "#FF0000" }}
-          />
+            <a href="#about" className="hover:text-blue-600">
+              About
+            </a>
+
+            <Link
+              href="/login"
+              className="hover:text-blue-600"
+            >
+              Login
+            </Link>
+
+            <Link
+              href="/register"
+              className="hover:text-blue-600"
+            >
+              Register
+            </Link>
+
+          </div>
 
         </div>
 
-      </div>
+      </footer>
 
-    </div>
-
-    <hr className="my-10 border-slate-700" />
-
-    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-
-      <p
-        style={{
-          color: "#CBD5E1",
-        }}
-      >
-        © 2026 SocialPilot. All Rights Reserved.
-      </p>
-
-      <p
-        style={{
-          color: "#94A3B8",
-        }}
-      >
-        Built with ❤️ for Creators & Businesses
-      </p>
-
-    </div>
-
-  </div>
-
-</footer>
-
-</main>
-);
+    </main>
+  );
 }
