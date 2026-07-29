@@ -1,3 +1,4 @@
+
 SocialPilot Backend
 FastAPI + PostgreSQL backend for SocialPilot.
 
@@ -15,3 +16,5 @@ campaigns — grouped marketing campaigns
 post_analytics — engagement metrics per post/campaign
 Schema Details
 Full column definitions and relationships are in models.py. Table creation is managed via Alembic migrations in the alembic/ folder.
+
+
