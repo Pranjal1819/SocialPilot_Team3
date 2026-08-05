@@ -25,9 +25,28 @@ class ScheduledPost(Base):
     # --------------------------
     # Campaign Relationship
     # --------------------------
-    # One campaign can contain many posts
 
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
+
+    # --------------------------
+    # Social Account Relationship
+    # --------------------------
+    #
+    # Exact social account used
+    # for publishing
+    #
+    # Example:
+    #
+    # User
+    #    |
+    #    |-- LinkedIn Account A
+    #    |
+    #    |-- LinkedIn Account B
+    #
+    # Post selects one account
+    #
+
+    social_account_id = Column(Integer, ForeignKey("social_accounts.id"), nullable=True)
 
     # --------------------------
     # Post Details
@@ -37,7 +56,6 @@ class ScheduledPost(Base):
 
     caption = Column(Text, nullable=True)
 
-    # Content Types:
     # text
     # image
     # video
@@ -61,35 +79,17 @@ class ScheduledPost(Base):
 
     scheduled_time = Column(DateTime, nullable=True)
 
-    # User timezone
-    # Examples:
-    # Asia/Kolkata
-    # America/New_York
-    # Europe/London
-
     timezone = Column(String(50), nullable=False, default="UTC")
 
     # --------------------------
     # Recurring Scheduling
     # --------------------------
 
-    # True if post repeats
-
     is_recurring = Column(Boolean, default=False, nullable=False)
-
-    # daily
-    # weekly
-    # monthly
 
     recurrence_type = Column(String(50), nullable=True)
 
-    # Example:
-    # Every 1 day
-    # Every 2 weeks
-
     recurrence_interval = Column(Integer, default=1)
-
-    # Next time recurring post runs
 
     next_run_time = Column(DateTime, nullable=True)
 
@@ -105,17 +105,25 @@ class ScheduledPost(Base):
 
     status = Column(String(50), nullable=False, default="draft")
 
-    # Failure reason
-
     failure_reason = Column(Text, nullable=True)
-
-    # Celery retry count
 
     retry_count = Column(Integer, default=0)
 
-    # Actual publishing time
-
     published_at = Column(DateTime, nullable=True)
+
+    # --------------------------
+    # External Platform Tracking
+    # --------------------------
+
+    # LinkedIn share URN
+    # Example:
+    # urn:li:share:7488501498956591105
+
+    platform_post_id = Column(String(500), nullable=True)
+
+    # Public URL
+
+    published_url = Column(String(500), nullable=True)
 
     # --------------------------
     # Timestamps
@@ -129,15 +137,11 @@ class ScheduledPost(Base):
     # Relationships
     # --------------------------
 
-    # User → Scheduled Posts
-
     user = relationship("User", back_populates="scheduled_posts")
-
-    # Campaign → Scheduled Posts
 
     campaign = relationship("Campaign", back_populates="scheduled_posts")
 
-    # Post → Analytics
+    social_account = relationship("SocialAccount", back_populates="scheduled_posts")
 
     analytics = relationship(
         "PostAnalytics", back_populates="post", cascade="all, delete-orphan"

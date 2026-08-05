@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_SECRET: str
     LINKEDIN_REDIRECT_URI: str
 
+    secret_key: str
+    debug: bool = False
+
     class Config:
         env_file = ".env"
 
