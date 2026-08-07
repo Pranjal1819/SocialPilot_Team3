@@ -14,9 +14,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    model_config = SettingsConfigDict(
-        env_file=".env"
-    )
+    # Local disk media upload settings
+    UPLOAD_DIR: str = "app/static/uploads"
+    MAX_UPLOAD_SIZE_MB: int = 50
+    BASE_URL: str = "http://127.0.0.1:8000"
+
+    model_config = SettingsConfigDict(env_file=".env")
 
 
 settings = Settings()

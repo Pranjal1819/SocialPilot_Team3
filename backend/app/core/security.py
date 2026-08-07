@@ -7,6 +7,7 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+
 from .config import settings
 
 # --------------------------------------
@@ -81,7 +82,6 @@ def decode_access_token(token: str) -> dict:
     """
 
     try:
-
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
@@ -89,7 +89,6 @@ def decode_access_token(token: str) -> dict:
         return payload
 
     except JWTError:
-
         return None
 
 
@@ -122,11 +121,9 @@ def decrypt_token(encrypted_token: str) -> str:
         return None
 
     try:
-
         decrypted = cipher.decrypt(encrypted_token.encode())
 
         return decrypted.decode()
 
     except InvalidToken:
-
         raise Exception("Invalid encrypted token")

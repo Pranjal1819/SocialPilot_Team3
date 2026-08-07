@@ -1,13 +1,11 @@
-# app/schemas/analytics.py
-
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, List, Any
 from datetime import datetime
-
 
 # ==========================================
 # Base Post Analytics
 # ==========================================
+
 
 class PostAnalyticsBase(BaseModel):
 
@@ -27,11 +25,16 @@ class PostAnalyticsBase(BaseModel):
 
     views: int = 0
 
+    reach: int = 0
 
+    impressions: int = 0
+
+    clicks: int = 0
+
+    saves: int = 0
 
 class PostAnalyticsCreate(PostAnalyticsBase):
     pass
-
 
 
 class PostAnalyticsUpdate(BaseModel):
@@ -44,7 +47,13 @@ class PostAnalyticsUpdate(BaseModel):
 
     views: Optional[int] = None
 
+    reach: Optional[int] = None
 
+    impressions: Optional[int] = None
+
+    clicks: Optional[int] = None
+
+    saves: Optional[int] = None
 
 class PostAnalyticsResponse(PostAnalyticsBase):
 
@@ -52,15 +61,14 @@ class PostAnalyticsResponse(PostAnalyticsBase):
 
     recorded_at: datetime
 
-
     class Config:
         from_attributes = True
-
 
 
 # ==========================================
 # Dashboard Overview
 # ==========================================
+
 
 class AnalyticsOverview(BaseModel):
 
@@ -76,7 +84,6 @@ class AnalyticsOverview(BaseModel):
 
     pending_posts: int = 0
 
-
     total_engagement: int
 
     total_likes: int = 0
@@ -86,7 +93,6 @@ class AnalyticsOverview(BaseModel):
     total_comments: int = 0
 
     total_views: int = 0
-
 
     average_engagement_per_post: float
 
@@ -98,24 +104,23 @@ class AnalyticsOverview(BaseModel):
 
     period_days: int
 
-    platform_breakdown: Dict = {}
-
+    platform_breakdown: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ==========================================
 # Audience Analytics
 # ==========================================
 
+
 class AudienceAnalytics(BaseModel):
 
     total_followers: int
 
-    follower_growth: List[Dict]
+    follower_growth: List[Dict[str, Any]]
 
-    demographics: Dict
+    demographics: Dict[str, Any]
 
-    geographic_distribution: Dict
-
+    geographic_distribution: Dict[str, Any]
 
     total_likes: int
 
@@ -127,7 +132,6 @@ class AudienceAnalytics(BaseModel):
 
     total_engagement: int
 
-
     engagement_rate: float
 
     period_days: int
@@ -135,10 +139,10 @@ class AudienceAnalytics(BaseModel):
     total_posts: int
 
 
-
 # ==========================================
 # Platform Analytics
 # ==========================================
+
 
 class PlatformAnalytics(BaseModel):
 
@@ -154,7 +158,6 @@ class PlatformAnalytics(BaseModel):
 
     draft_posts: int = 0
 
-
     likes: int = 0
 
     shares: int = 0
@@ -163,7 +166,6 @@ class PlatformAnalytics(BaseModel):
 
     views: int = 0
 
-
     total_engagement: int
 
     average_engagement: float
@@ -171,10 +173,10 @@ class PlatformAnalytics(BaseModel):
     engagement_rate: float = 0
 
 
-
 # ==========================================
 # Post Performance
 # ==========================================
+
 
 class PostPerformanceMetrics(BaseModel):
 
@@ -186,11 +188,9 @@ class PostPerformanceMetrics(BaseModel):
 
     platform: str
 
-
     scheduled_time: Optional[datetime] = None
 
     published_at: Optional[datetime] = None
-
 
     likes: int
 
@@ -200,25 +200,22 @@ class PostPerformanceMetrics(BaseModel):
 
     views: int
 
-
     total_engagement: int = 0
 
     engagement_rate: float
-
 
     status: str
 
     created_at: datetime
 
-
     class Config:
         from_attributes = True
-
 
 
 # ==========================================
 # Campaign Analytics
 # ==========================================
+
 
 class CampaignAnalyticsResponse(BaseModel):
 
@@ -230,13 +227,11 @@ class CampaignAnalyticsResponse(BaseModel):
 
     description: Optional[str] = None
 
-
     start_date: datetime
 
     end_date: datetime
 
     status: str
-
 
     total_posts: int
 
@@ -248,7 +243,6 @@ class CampaignAnalyticsResponse(BaseModel):
 
     draft_posts: int
 
-
     likes: int = 0
 
     shares: int = 0
@@ -257,21 +251,19 @@ class CampaignAnalyticsResponse(BaseModel):
 
     views: int = 0
 
-
     total_engagement: int = 0
 
     engagement_rate: float = 0
 
-
-    post_performance: List[Dict] = []
+    post_performance: List[Dict[str, Any]] = Field(default_factory=list)
 
     period_days: int
-
 
 
 # ==========================================
 # Analytics Summary
 # ==========================================
+
 
 class AnalyticsSummary(BaseModel):
 
@@ -283,37 +275,158 @@ class AnalyticsSummary(BaseModel):
 
     failed_posts: int
 
-
     today_posts: int
 
     total_engagement: int
-
 
     active_campaigns: int
 
     connected_accounts: int
 
-
-    recent_posts: List[Dict]
-
+    recent_posts: List[Dict[str, Any]]
 
 
 # ==========================================
 # Engagement Trend
 # ==========================================
 
+
 class EngagementTrend(BaseModel):
 
     period_days: int
 
-    data: List[Dict]
-
+    data: List[Dict[str, Any]]
 
     average_daily_engagement: float
 
     average_daily_views: float
 
-
     total_engagement: int
 
     total_views: int
+
+
+# ==========================================
+# Audience Analytics Record (stored table)
+# ==========================================
+
+
+class AudienceAnalyticsRecordBase(BaseModel):
+
+    user_id: int
+
+    social_account_id: Optional[int] = None
+
+    platform: str
+
+    total_followers: int = 0
+
+    new_followers: int = 0
+
+    lost_followers: int = 0
+
+    net_growth: int = 0
+
+    gender_distribution: Optional[Dict[str, Any]] = None
+
+    age_distribution: Optional[Dict[str, Any]] = None
+
+    country: Optional[str] = None
+
+    city: Optional[str] = None
+
+    languages: Optional[Dict[str, Any]] = None
+
+    most_active_hours: Optional[Dict[str, Any]] = None
+
+    most_active_days: Optional[Dict[str, Any]] = None
+
+
+class AudienceAnalyticsRecordCreate(AudienceAnalyticsRecordBase):
+    pass
+
+
+class AudienceAnalyticsRecordResponse(AudienceAnalyticsRecordBase):
+
+    id: int
+
+    recorded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# Campaign Analytics Snapshot (stored table)
+# ==========================================
+
+
+class CampaignAnalyticsSnapshotBase(BaseModel):
+
+    campaign_id: int
+
+    total_posts: int = 0
+
+    reach: int = 0
+
+    impressions: int = 0
+
+    engagement: int = 0
+
+    clicks: int = 0
+
+    likes: int = 0
+
+    roi: Optional[int] = None
+
+    completion_percentage: int = 0
+
+
+class CampaignAnalyticsSnapshotCreate(CampaignAnalyticsSnapshotBase):
+    pass
+
+
+class CampaignAnalyticsSnapshotResponse(CampaignAnalyticsSnapshotBase):
+
+    id: int
+
+    recorded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# Platform Analytics Record (stored table)
+# ==========================================
+
+
+class PlatformAnalyticsRecordBase(BaseModel):
+
+    user_id: int
+
+    platform_name: str
+
+    followers: int = 0
+
+    reach: int = 0
+
+    engagement: int = 0
+
+    impressions: int = 0
+
+    clicks: int = 0
+
+
+class PlatformAnalyticsRecordCreate(PlatformAnalyticsRecordBase):
+    pass
+
+
+class PlatformAnalyticsRecordResponse(PlatformAnalyticsRecordBase):
+
+    id: int
+
+    recorded_at: datetime
+
+    class Config:
+        from_attributes = True

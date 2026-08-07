@@ -3,14 +3,13 @@
 from .user import (
     UserBase,
     UserCreate,
-    UserCreateOAuth,
     UserLogin,
     UserUpdate,
     UserResponse,
     UserProfileResponse,
     Token,
     TokenData,
-    UserRole
+    UserRole,
 )
 
 from .campaign import (
@@ -19,7 +18,7 @@ from .campaign import (
     CampaignUpdate,
     CampaignResponse,
     CampaignAnalytics,
-    CampaignStatus
+    CampaignStatus,
 )
 
 from .scheduled_post import (
@@ -28,7 +27,7 @@ from .scheduled_post import (
     ScheduledPostUpdate,
     ScheduledPostResponse,
     ScheduledPostWithAnalytics,
-    PostStatus
+    PostStatus,
 )
 
 from .social_account import (
@@ -39,7 +38,7 @@ from .social_account import (
     SocialAccountConnect,
     SocialAccountRefresh,
     SocialAccountConnectResponse,
-    SocialPlatform
+    SocialPlatform,
 )
 
 from .analytics import (
@@ -50,14 +49,19 @@ from .analytics import (
     AnalyticsOverview,
     AudienceAnalytics,
     PlatformAnalytics,
-    PostPerformanceMetrics
+    PostPerformanceMetrics,
+    AudienceAnalyticsRecordCreate,
+    AudienceAnalyticsRecordResponse,
+    CampaignAnalyticsSnapshotCreate,
+    CampaignAnalyticsSnapshotResponse,
+    PlatformAnalyticsRecordCreate,
+    PlatformAnalyticsRecordResponse,
 )
 
 __all__ = [
     # User schemas
     "UserBase",
     "UserCreate",
-    "UserCreateOAuth",
     "UserLogin",
     "UserUpdate",
     "UserResponse",
@@ -65,7 +69,6 @@ __all__ = [
     "Token",
     "TokenData",
     "UserRole",
-    
     # Campaign schemas
     "CampaignBase",
     "CampaignCreate",
@@ -73,7 +76,6 @@ __all__ = [
     "CampaignResponse",
     "CampaignAnalytics",
     "CampaignStatus",
-    
     # Scheduled Post schemas
     "ScheduledPostBase",
     "ScheduledPostCreate",
@@ -81,7 +83,6 @@ __all__ = [
     "ScheduledPostResponse",
     "ScheduledPostWithAnalytics",
     "PostStatus",
-    
     # Social Account schemas
     "SocialAccountBase",
     "SocialAccountCreate",
@@ -91,7 +92,6 @@ __all__ = [
     "SocialAccountRefresh",
     "SocialAccountConnectResponse",
     "SocialPlatform",
-    
     # Analytics schemas
     "PostAnalyticsBase",
     "PostAnalyticsCreate",
@@ -101,4 +101,10 @@ __all__ = [
     "AudienceAnalytics",
     "PlatformAnalytics",
     "PostPerformanceMetrics",
+    "AudienceAnalyticsRecordCreate",
+    "AudienceAnalyticsRecordResponse",
+    "CampaignAnalyticsSnapshotCreate",
+    "CampaignAnalyticsSnapshotResponse",
+    "PlatformAnalyticsRecordCreate",
+    "PlatformAnalyticsRecordResponse",
 ]

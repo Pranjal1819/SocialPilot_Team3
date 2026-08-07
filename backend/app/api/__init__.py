@@ -5,6 +5,7 @@ from .posts import router as posts_router
 from .campaigns import router as campaigns_router
 from .social import router as social_router
 from .analytics import router as analytics_router
+from .admin import router as admin_router
 from .business_assignment import router as business_assignment_router
 from .business_management import router as business_management_router
 
@@ -14,6 +15,7 @@ __all__ = [
     "campaigns_router",
     "social_router",
     "analytics_router",
+    "admin_router",
     "business_assignment_router",
     "business_management_router",
 ]

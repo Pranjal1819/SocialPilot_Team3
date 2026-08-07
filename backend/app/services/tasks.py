@@ -15,14 +15,36 @@ from app.core.security import decrypt_token
 from app.models.scheduled_post import ScheduledPost
 from app.models.notification import Notification
 from app.models.social_account import SocialAccount
+from app.models.post_media import PostMedia
 
 from app.services.social.linkedin import LinkedInService
 
 from datetime import datetime, timedelta
+from pathlib import Path
+from urllib.parse import urlparse
+
+from PIL import Image
 
 # ==================================================
-# TASK 1:
-# Check Redis queue and publish due posts
+# Convert media URL to local path
+# ==================================================
+
+
+def get_local_media_path(media):
+
+    if media.file_path:
+        return media.file_path
+
+    parsed = urlparse(media.media_url)
+
+    local_path = Path("app/static") / parsed.path.lstrip("/")
+
+    return str(local_path)
+
+
+# ==================================================
+# TASK 1
+# Check Redis queue
 # ==================================================
 
 
@@ -31,7 +53,7 @@ def check_and_publish():
 
     due_posts = get_due_posts()
 
-    logger.info(f"[QUEUE] Found {len(due_posts)} posts due for publishing")
+    logger.info(f"[QUEUE] Found {len(due_posts)} posts")
 
     for post_id in due_posts:
 
@@ -39,14 +61,8 @@ def check_and_publish():
 
 
 # ==================================================
-# TASK 2:
+# TASK 2
 # Publish Scheduled Post
-#
-# scheduled
-#      ↓
-# processing
-#      ↓
-# published / failed
 # ==================================================
 
 
@@ -55,15 +71,13 @@ def publish_post(self, post_id: int):
 
     db = SessionLocal()
 
-    access_token = None
-
     try:
 
         post = db.query(ScheduledPost).filter(ScheduledPost.id == post_id).first()
 
         if not post:
 
-            logger.warning(f"[POST {post_id}] Post not found")
+            logger.warning(f"[POST {post_id}] Not found")
 
             remove_from_queue(post_id)
 
@@ -71,31 +85,24 @@ def publish_post(self, post_id: int):
 
         try:
 
-            # --------------------------------
-            # CHECK SCHEDULE TIME
-            # --------------------------------
+            # --------------------------
+            # Check schedule
+            # --------------------------
 
             if post.scheduled_time > datetime.now():
 
-                logger.info(f"[POST {post_id}] Scheduled time not reached")
+                logger.info(f"[POST {post_id}] Not due")
 
                 return
 
-            # --------------------------------
-            # PROCESSING STATUS
-            # --------------------------------
+            # --------------------------
+            # PROCESSING
+            # --------------------------
 
             post.status = "processing"
-
             db.commit()
 
             update_status(post_id, "processing")
-
-            logger.info(f"[POST {post_id}] STATUS: PROCESSING")
-
-            # --------------------------------
-            # GET EXACT SOCIAL ACCOUNT
-            # --------------------------------
 
             account = (
                 db.query(SocialAccount)
@@ -107,65 +114,202 @@ def publish_post(self, post_id: int):
             )
 
             if not account:
-
-                raise Exception("Social account not found or inactive")
-
-            logger.info(f"[POST {post_id}] " f"Using account {account.account_name}")
-
-            # --------------------------------
-            # DECRYPT TOKEN
-            # --------------------------------
+                raise Exception("Social account inactive")
 
             access_token = decrypt_token(account.access_token)
 
-            logger.info(f"[POST {post_id}] Token decrypted")
-
-            # --------------------------------
-            # PLATFORM PUBLISHING
-            # --------------------------------
+            linkedin = LinkedInService()
 
             platform_post_id = None
+            response = None
+
+            # ==================================================
+            # LINKEDIN
+            # ==================================================
 
             if post.platform.lower() == "linkedin":
 
-                linkedin_service = LinkedInService()
+                media_files = post.media_files
 
-                response = linkedin_service.publish_post(
-                    access_token=access_token,
-                    author_id=account.account_id,
-                    text=post.caption,
-                )
+                # ==================================================
+                # TEXT POST
+                # ==================================================
 
-                logger.info(f"[POST {post_id}] " f"LinkedIn Response: {response}")
+                if not media_files:
 
-                if not response:
+                    response = linkedin.publish_post(
+                        access_token,
+                        account.account_id,
+                        post.caption,
+                    )
 
-                    raise Exception("LinkedIn returned empty response")
+                # ==================================================
+                # CAROUSEL POST
+                # LinkedIn Carousel = PDF Document Carousel
+                # ==================================================
 
-                platform_post_id = response.get("id")
+                elif post.content_type == "carousel":
 
-                if not platform_post_id:
+                    logger.info(f"[POST {post_id}] Carousel processing started")
 
-                    raise Exception("LinkedIn post id missing")
+                    if len(media_files) < 2:
+                        raise Exception("Carousel requires minimum 2 media files")
+
+                    carousel_images = []
+
+                    temp_pdf = Path("app/static") / f"carousel_{post_id}.pdf"
+
+                    try:
+
+                        # ------------------------------------------
+                        # Convert uploaded images into PDF
+                        # ------------------------------------------
+
+                        for media in media_files:
+
+                            if media.media_type not in ["image", "gif"]:
+                                raise Exception(
+                                    "LinkedIn carousel supports only images"
+                                )
+
+                            file_path = get_local_media_path(media)
+
+                            if not Path(file_path).exists():
+                                raise Exception(f"Media file not found: {file_path}")
+
+                            img = Image.open(file_path)
+
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+
+                            carousel_images.append(img)
+
+                        if not carousel_images:
+                            raise Exception("No valid carousel images found")
+
+                        first_image = carousel_images[0]
+                        remaining_images = carousel_images[1:]
+
+                        first_image.save(
+                            temp_pdf,
+                            save_all=True,
+                            append_images=remaining_images,
+                        )
+
+                        logger.info(f"[POST {post_id}] Carousel PDF created {temp_pdf}")
+
+                        # ------------------------------------------
+                        # Upload PDF to LinkedIn
+                        # ------------------------------------------
+
+                        upload_response = linkedin.register_media(
+                            access_token,
+                            account.account_id,
+                            "document",
+                        )
+
+                        upload_url = upload_response["value"]["uploadMechanism"][
+                            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+                        ]["uploadUrl"]
+
+                        asset = upload_response["value"]["asset"]
+
+                        linkedin.upload_media_file(
+                            access_token,
+                            upload_url,
+                            str(temp_pdf),
+                        )
+
+                        logger.info(f"[POST {post_id}] Carousel PDF uploaded {asset}")
+
+                        response = linkedin.publish_carousel_post(
+                            access_token,
+                            account.account_id,
+                            post.caption,
+                            asset,
+                        )
+
+                    finally:
+
+                        # cleanup generated PDF
+                        if temp_pdf.exists():
+                            temp_pdf.unlink()
+
+                    logger.info(f"[POST {post_id}] Carousel upload complete")
+
+                # ==================================================
+                # SINGLE MEDIA
+                # ==================================================
+
+                else:
+
+                    media = media_files[0]
+
+                    supported_types = [
+                        "image",
+                        "gif",
+                        "video",
+                        "document",
+                        "audio",
+                    ]
+
+                    if media.media_type not in supported_types:
+                        raise Exception(f"Unsupported media type {media.media_type}")
+
+                    file_path = get_local_media_path(media)
+
+                    if not Path(file_path).exists():
+                        raise Exception(f"Media file not found: {file_path}")
+
+                    logger.info(f"[POST {post_id}] Media type {media.media_type}")
+
+                    upload_response = linkedin.register_media(
+                        access_token,
+                        account.account_id,
+                        media.media_type,
+                    )
+
+                    upload_url = upload_response["value"]["uploadMechanism"][
+                        "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+                    ]["uploadUrl"]
+
+                    asset = upload_response["value"]["asset"]
+
+                    linkedin.upload_media_file(
+                        access_token,
+                        upload_url,
+                        file_path,
+                    )
+
+                    response = linkedin.publish_media_post(
+                        access_token,
+                        account.account_id,
+                        post.caption,
+                        asset,
+                        media.media_type,
+                    )
 
             else:
 
                 raise Exception(f"{post.platform} not supported")
 
-            # --------------------------------
-            # SUCCESS UPDATE
-            # --------------------------------
+            logger.info(f"[POST {post_id}] LinkedIn Response {response}")
+
+            platform_post_id = response.get("id")
+
+            if not platform_post_id:
+                raise Exception("LinkedIn post id missing")
+
+            # ==================================================
+            # SUCCESS
+            # ==================================================
 
             post.status = "published"
-
             post.published_at = datetime.now()
-
-            # Save LinkedIn details
-
             post.platform_post_id = platform_post_id
 
             post.published_url = (
-                f"https://www.linkedin.com/feed/update/{platform_post_id}"
+                "https://www.linkedin.com/feed/update/" f"{platform_post_id}"
             )
 
             db.commit()
@@ -174,77 +318,59 @@ def publish_post(self, post_id: int):
 
             update_status(post_id, "published")
 
-            logger.info(f"[POST {post_id}] STATUS: PUBLISHED")
-
-            notification = Notification(
-                user_id=post.user_id,
-                message=(
-                    f'Your post "{post.title}" '
-                    f"was published successfully "
-                    f"on {post.platform}."
-                ),
-                type="post_published",
+            db.add(
+                Notification(
+                    user_id=post.user_id,
+                    message=(
+                        f'Your post "{post.title}" '
+                        f"was published successfully on "
+                        f"{post.platform}"
+                    ),
+                    type="post_published",
+                )
             )
 
-            db.add(notification)
-
             db.commit()
+
+            logger.info(f"[POST {post_id}] PUBLISHED")
 
         except Exception as e:
 
-            logger.error(f"[POST {post_id}] ERROR: {str(e)}")
+            logger.error(f"[POST {post_id}] ERROR {e}")
 
-            post.retry_count += 1
-
-            db.commit()
-
-            if post.retry_count < 3:
-
-                post.status = "scheduled"
-
-                db.commit()
-
-                update_status(post_id, "scheduled")
-
-                logger.warning(f"[POST {post_id}] " f"Retry {post.retry_count}/3")
-
-                raise self.retry(exc=e, countdown=60)
-
-            # FINAL FAILURE
+            db.rollback()
 
             post.status = "failed"
-
-            post.failure_reason = str(e)
-
             db.commit()
 
             update_status(post_id, "failed")
 
-            notification = Notification(
-                user_id=post.user_id,
-                message=(
-                    f'Your post "{post.title}" '
-                    f"failed on {post.platform}. "
-                    f"Reason: {str(e)}"
-                ),
-                type="post_failed",
+            db.add(
+                Notification(
+                    user_id=post.user_id,
+                    message=(
+                        f'Your post "{post.title}" '
+                        f"failed to publish on {post.platform}: {e}"
+                    ),
+                    type="post_failed",
+                )
             )
-
-            db.add(notification)
 
             db.commit()
 
-            logger.error(f"[POST {post_id}] STATUS: FAILED")
+            try:
+                raise self.retry(exc=e, countdown=60)
+            except self.MaxRetriesExceededError:
+                logger.error(f"[POST {post_id}] Max retries exceeded")
+                remove_from_queue(post_id)
 
     finally:
-
-        access_token = None
 
         db.close()
 
 
 # ==================================================
-# TASK 3:
+# TASK 3
 # Recurring Posts
 # ==================================================
 
@@ -256,20 +382,18 @@ def process_recurring_posts():
 
     try:
 
-        current_time = datetime.now()
+        now = datetime.now()
 
-        recurring_posts = (
+        posts = (
             db.query(ScheduledPost)
             .filter(
                 ScheduledPost.is_recurring == True,
-                ScheduledPost.next_run_time <= current_time,
+                ScheduledPost.next_run_time <= now,
             )
             .all()
         )
 
-        logger.info(f"Found {len(recurring_posts)} recurring posts")
-
-        for post in recurring_posts:
+        for post in posts:
 
             new_post = ScheduledPost(
                 user_id=post.user_id,
@@ -277,11 +401,9 @@ def process_recurring_posts():
                 social_account_id=post.social_account_id,
                 title=post.title,
                 caption=post.caption,
-                media_url=post.media_url,
                 content_type=post.content_type,
                 platform=post.platform,
                 scheduled_time=post.next_run_time,
-                timezone=post.timezone,
                 status="scheduled",
                 is_recurring=True,
                 recurrence_type=post.recurrence_type,
@@ -289,24 +411,38 @@ def process_recurring_posts():
             )
 
             db.add(new_post)
+            db.flush()
 
-            if post.recurrence_type == "daily":
+            # Copy media files
+            for media in post.media_files:
 
-                post.next_run_time += timedelta(days=post.recurrence_interval)
-
-            elif post.recurrence_type == "weekly":
-
-                post.next_run_time += timedelta(weeks=post.recurrence_interval)
-
-            elif post.recurrence_type == "monthly":
-
-                post.next_run_time += timedelta(days=30 * post.recurrence_interval)
+                db.add(
+                    PostMedia(
+                        post_id=new_post.id,
+                        media_url=media.media_url,
+                        file_path=media.file_path,
+                        media_type=media.media_type,
+                        thumbnail_url=media.thumbnail_url,
+                        mime_type=media.mime_type,
+                        file_size=media.file_size,
+                        duration=media.duration,
+                        display_order=media.display_order,
+                    )
+                )
 
             db.commit()
 
             add_to_queue(new_post.id, new_post.scheduled_time.timestamp())
 
-            logger.info(f"Recurring post created {new_post.id}")
+            logger.info(f"[RECURRING] Created post {new_post.id}")
+
+    except Exception as e:
+
+        logger.error(f"[RECURRING] ERROR {e}")
+
+        db.rollback()
+
+        raise
 
     finally:
 
@@ -314,7 +450,7 @@ def process_recurring_posts():
 
 
 # ==================================================
-# TASK 4:
+# TASK 4
 # Token Expiry Notification
 # ==================================================
 
@@ -326,30 +462,36 @@ def refresh_expiring_tokens():
 
     try:
 
-        expiry_threshold = datetime.now() + timedelta(hours=1)
+        expiry = datetime.now() + timedelta(hours=1)
 
         accounts = (
             db.query(SocialAccount)
             .filter(
-                SocialAccount.token_expires_at <= expiry_threshold,
+                SocialAccount.token_expires_at <= expiry,
                 SocialAccount.is_active == True,
             )
             .all()
         )
 
-        logger.info(f"Tokens expiring: {len(accounts)}")
-
         for account in accounts:
 
-            notification = Notification(
-                user_id=account.user_id,
-                message=(f"Your {account.platform} " f"connection needs attention."),
-                type="token_expired",
+            db.add(
+                Notification(
+                    user_id=account.user_id,
+                    message=(f"Your {account.platform} " "connection needs attention."),
+                    type="token_expired",
+                )
             )
 
-            db.add(notification)
+        db.commit()
 
-            db.commit()
+    except Exception as e:
+
+        logger.error(f"[TOKEN REFRESH] ERROR {e}")
+
+        db.rollback()
+
+        raise
 
     finally:
 

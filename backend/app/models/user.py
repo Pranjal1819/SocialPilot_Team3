@@ -1,6 +1,11 @@
-# app/models/user.py
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+)
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -11,47 +16,110 @@ class User(Base):
 
     __tablename__ = "users"
 
-    # =========================
-    # User Columns
-    # =========================
+    # ==================================================
+    # Primary Key
+    # ==================================================
 
     id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(String(100), nullable=False)
+    # ==================================================
+    # Basic Information
+    # ==================================================
 
-    email = Column(String(200), unique=True, nullable=False, index=True)
+    name = Column(
+        String(100),
+        nullable=False,
+    )
 
-    password = Column(String(255), nullable=True)
+    email = Column(
+        String(200),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
 
-    # LinkedIn OAuth user id (optional)
+    password = Column(
+        String(255),
+        nullable=True,
+    )
 
-    linkedin_id = Column(String(255), unique=True, nullable=True)
-
-    # =========================
-    # User Role
-    # =========================
-
-    # admin
-    # business_user
-    # marketing_team
-    # content_creator
-
-    role = Column(String(50), nullable=False)
-
-    profile_picture = Column(String(500), nullable=True)
-
-    is_active = Column(Boolean, default=True, nullable=False)
-
-    # =========================
-    # Timestamps
-    # =========================
-
-    created_at = Column(DateTime, default=func.now())
-
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    linkedin_id = Column(
+        String(255),
+        unique=True,
+        nullable=True,
+    )
 
     # ==================================================
-    # Campaign Relationships
+    # Profile
+    # ==================================================
+
+    phone = Column(
+        String(20),
+        nullable=True,
+    )
+
+    organization = Column(
+        String(200),
+        nullable=True,
+    )
+
+    designation = Column(
+        String(100),
+        nullable=True,
+    )
+
+    profile_picture = Column(
+        String(500),
+        nullable=True,
+    )
+
+    bio = Column(
+        String(500),
+        nullable=True,
+    )
+
+    # ==================================================
+    # Role
+    # ==================================================
+
+    role = Column(
+        String(50),
+        nullable=False,
+    )
+
+    # ==================================================
+    # Status
+    # ==================================================
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
+    is_verified = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    # ==================================================
+    # Audit
+    # ==================================================
+
+    created_at = Column(
+        DateTime,
+        default=func.now(),
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+    # ==================================================
+    # Campaigns
     # ==================================================
 
     campaigns = relationship(
@@ -68,25 +136,23 @@ class User(Base):
     )
 
     # ==================================================
-    # Scheduled Posts
+    # Posts
     # ==================================================
 
     scheduled_posts = relationship(
         "ScheduledPost",
+        foreign_keys="ScheduledPost.user_id",
         back_populates="user",
         cascade="all, delete-orphan",
     )
 
+    approved_posts = relationship(
+        "ScheduledPost",
+        foreign_keys="ScheduledPost.approved_by",
+    )
+
     # ==================================================
     # Social Accounts
-    #
-    # User
-    #   |
-    #   |
-    #   +---- LinkedIn Account
-    #   |
-    #   +---- Instagram Account
-    #
     # ==================================================
 
     social_accounts = relationship(
@@ -121,4 +187,16 @@ class User(Base):
         foreign_keys="BusinessAssignment.marketing_team_id",
         back_populates="marketing_team",
         cascade="all, delete-orphan",
+    )
+
+    # ==================================================
+    # Analytics
+    # Matches analytics.py:
+    # user = relationship("User", back_populates="analytics")
+    # ==================================================
+
+    analytics = relationship(
+        "PostAnalytics",
+        back_populates="user",
+        cascade="all, delete-orphan"
     )

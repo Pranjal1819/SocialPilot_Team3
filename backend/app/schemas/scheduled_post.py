@@ -1,9 +1,11 @@
 # app/schemas/scheduled_post.py
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+from app.models.enums import ContentType, MEDIA_REQUIRED_CONTENT_TYPES
 
 # --------------------------------------
 # Post Status Enum
@@ -22,6 +24,37 @@ class PostStatus(str, Enum):
 
 
 # --------------------------------------
+# Media Item (maps to PostMedia rows)
+# --------------------------------------
+
+
+class PostMediaItem(BaseModel):
+
+    media_url: str = Field(..., max_length=500)
+
+    media_type: str = Field(..., description="image, video, audio, gif, document")
+
+    thumbnail_url: Optional[str] = Field(None, max_length=500)
+
+    mime_type: Optional[str] = None
+
+    file_size: Optional[int] = None
+
+    duration: Optional[int] = None
+
+    display_order: int = 1
+
+
+class PostMediaResponse(PostMediaItem):
+
+    id: int
+
+    class Config:
+
+        from_attributes = True
+
+
+# --------------------------------------
 # Base Schema
 # --------------------------------------
 
@@ -32,7 +65,7 @@ class ScheduledPostBase(BaseModel):
 
     caption: Optional[str] = None
 
-    media_url: Optional[str] = Field(None, max_length=500)
+    content_type: ContentType = ContentType.TEXT
 
     platform: str = Field(..., description="linkedin, instagram, facebook, twitter")
 
@@ -51,7 +84,24 @@ class ScheduledPostBase(BaseModel):
 
 class ScheduledPostCreate(ScheduledPostBase):
 
-    pass
+    media: Optional[List[PostMediaItem]] = None
+
+    @model_validator(mode="after")
+    def validate_media_for_content_type(self):
+
+        if self.content_type in MEDIA_REQUIRED_CONTENT_TYPES and not self.media:
+
+            raise ValueError(
+                f"content_type '{self.content_type.value}' requires at least one media item"
+            )
+
+        if self.content_type == ContentType.CAROUSEL and (
+            not self.media or len(self.media) < 2
+        ):
+
+            raise ValueError("content_type 'carousel' requires at least 2 media items")
+
+        return self
 
 
 # --------------------------------------
@@ -65,7 +115,10 @@ class ScheduledPostUpdate(BaseModel):
 
     caption: Optional[str] = None
 
-    media_url: Optional[str] = None
+    content_type: Optional[ContentType] = None
+
+    # Passing this replaces all existing media for the post
+    media: Optional[List[PostMediaItem]] = None
 
     platform: Optional[str] = None
 
@@ -90,6 +143,8 @@ class ScheduledPostResponse(ScheduledPostBase):
     user_id: int
 
     status: PostStatus
+
+    media_files: List[PostMediaResponse] = []
 
     retry_count: int = 0
 

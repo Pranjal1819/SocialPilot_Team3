@@ -135,7 +135,13 @@ def linkedin_callback(
 
                 db.refresh(user)
 
-        jwt_token = create_access_token(data={"sub": user.email, "user_id": user.id})
+        jwt_token = create_access_token(
+            data={
+                "sub": user.email,
+                "user_id": user.id,
+                "role": user.role,
+            }
+        )
 
         redirect_url = f"{frontend_url}" f"?token={jwt_token}" f"&user_id={user.id}"
 
@@ -230,6 +236,7 @@ def available_roles(db: Session = Depends(get_db)):
 # Login
 # ============================================================
 
+
 @router.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -240,11 +247,7 @@ def login(
         print("========== LOGIN REQUEST ==========")
         print("Email:", form_data.username)
 
-        user = (
-            db.query(User)
-            .filter(User.email == form_data.username)
-            .first()
-        )
+        user = db.query(User).filter(User.email == form_data.username).first()
 
         if not user:
             print("User not found")
@@ -284,6 +287,7 @@ def login(
             data={
                 "sub": user.email,
                 "user_id": user.id,
+                "role": user.role,
             }
         )
 
@@ -312,6 +316,7 @@ def login(
         print(type(e))
         print(e)
         import traceback
+
         traceback.print_exc()
 
         raise HTTPException(
