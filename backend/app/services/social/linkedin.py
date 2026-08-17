@@ -22,7 +22,7 @@ class LinkedInService:
         return "https://www.linkedin.com/oauth/v2/authorization?" + urlencode(params)
 
     # ==================================================
-    # Exchange Token
+    # Exchange Authorization Code for Tokens
     # ==================================================
 
     def exchange_code(self, code, redirect_uri):
@@ -40,9 +40,49 @@ class LinkedInService:
         )
 
         if not response.ok:
-            raise Exception(response.text)
+            raise Exception(
+                f"LinkedIn token exchange failed: "
+                f"{response.status_code} - {response.text}"
+            )
 
         return response.json()
+
+    # ==================================================
+    # Refresh Access Token
+    # ==================================================
+
+    def refresh_access_token(self, refresh_token):
+
+        if not refresh_token:
+            raise Exception("LinkedIn refresh token is missing")
+
+        response = requests.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": settings.LINKEDIN_CLIENT_ID,
+                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+            },
+            timeout=10,
+        )
+
+        if not response.ok:
+            raise Exception(
+                f"LinkedIn token refresh failed: "
+                f"{response.status_code} - {response.text}"
+            )
+
+        data = response.json()
+
+        access_token = data.get("access_token")
+
+        if not access_token:
+            raise Exception(
+                "LinkedIn token refresh succeeded but no access token " "was returned"
+            )
+
+        return data
 
     # ==================================================
     # Profile
@@ -57,7 +97,10 @@ class LinkedInService:
         )
 
         if not response.ok:
-            raise Exception(response.text)
+            raise Exception(
+                f"LinkedIn profile request failed: "
+                f"{response.status_code} - {response.text}"
+            )
 
         return response.json()
 
@@ -95,11 +138,9 @@ class LinkedInService:
         }
 
         if media_type == "audio":
-
             raise Exception("LinkedIn does not support audio posts")
 
         if media_type not in recipes:
-
             raise Exception(f"Unsupported media type {media_type}")
 
         payload = {
@@ -126,8 +167,10 @@ class LinkedInService:
         )
 
         if not response.ok:
-
-            raise Exception(response.text)
+            raise Exception(
+                f"LinkedIn media registration failed: "
+                f"{response.status_code} - {response.text}"
+            )
 
         return response.json()
 
@@ -148,7 +191,10 @@ class LinkedInService:
 
         if response.status_code not in [200, 201]:
 
-            raise Exception(response.text)
+            raise Exception(
+                f"LinkedIn media upload failed: "
+                f"{response.status_code} - {response.text}"
+            )
 
         return True
 
@@ -246,6 +292,8 @@ class LinkedInService:
 
         if response.status_code not in [200, 201]:
 
-            raise Exception(response.text)
+            raise Exception(
+                f"LinkedIn post failed: " f"{response.status_code} - {response.text}"
+            )
 
         return response.json()

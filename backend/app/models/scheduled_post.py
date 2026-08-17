@@ -276,3 +276,8 @@ class ScheduledPost(Base):
         back_populates="post",
         cascade="all, delete-orphan",
     )
+    publish_logs = relationship(
+    "PublishLog",
+    back_populates="scheduled_post",
+    cascade="all, delete-orphan",
+)

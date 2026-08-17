@@ -8,6 +8,7 @@ from .analytics import router as analytics_router
 from .admin import router as admin_router
 from .business_assignment import router as business_assignment_router
 from .business_management import router as business_management_router
+from .notifications import router as notifications_router
 
 __all__ = [
     "auth_router",
@@ -18,4 +19,5 @@ __all__ = [
     "admin_router",
     "business_assignment_router",
     "business_management_router",
+    "notifications_router",
 ]

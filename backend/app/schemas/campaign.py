@@ -8,10 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.scheduled_post import ScheduledPostResponse
 
-
 # ==========================================================
 # Campaign Status Enum
 # ==========================================================
+
 
 class CampaignStatus(str, Enum):
     DRAFT = "draft"
@@ -25,13 +25,10 @@ class CampaignStatus(str, Enum):
 # Base Schema
 # ==========================================================
 
+
 class CampaignBase(BaseModel):
 
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=200
-    )
+    name: str = Field(..., min_length=1, max_length=200)
 
     description: Optional[str] = None
 
@@ -48,6 +45,7 @@ class CampaignBase(BaseModel):
 # Create Campaign
 # ==========================================================
 
+
 class CampaignCreate(CampaignBase):
     pass
 
@@ -55,6 +53,7 @@ class CampaignCreate(CampaignBase):
 # ==========================================================
 # Update Campaign
 # ==========================================================
+
 
 class CampaignUpdate(BaseModel):
 
@@ -70,10 +69,13 @@ class CampaignUpdate(BaseModel):
 
     status: Optional[CampaignStatus] = None
 
+    marketing_team_id: Optional[int] = None
+
 
 # ==========================================================
 # Status Update
 # ==========================================================
+
 
 class CampaignStatusUpdate(BaseModel):
 
@@ -84,6 +86,7 @@ class CampaignStatusUpdate(BaseModel):
 # Campaign Response
 # ==========================================================
 
+
 class CampaignResponse(CampaignBase):
 
     id: int
@@ -91,7 +94,6 @@ class CampaignResponse(CampaignBase):
     user_id: int
 
     created_at: datetime
-
 
     # Post Metrics
 
@@ -103,7 +105,6 @@ class CampaignResponse(CampaignBase):
 
     draft_posts: int = 0
 
-
     # Engagement Metrics
 
     likes: int = 0
@@ -114,62 +115,44 @@ class CampaignResponse(CampaignBase):
 
     views: int = 0
 
-
     total_engagement: int = 0
 
     engagement_rate: float = 0.0
 
+    engagement_metrics: Dict[str, Any] = Field(default_factory=dict)
 
-    engagement_metrics: Dict[str, Any] = Field(
-        default_factory=dict
-    )
-
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================================
 # Campaign Detail Response
 # ==========================================================
 
+
 class CampaignDetailResponse(CampaignResponse):
 
     # Linked Scheduled Posts
     # campaigns.id -> scheduled_posts.campaign_id
 
-    posts: List[ScheduledPostResponse] = Field(
-        default_factory=list
-    )
-
+    posts: List[ScheduledPostResponse] = Field(default_factory=list)
 
     # Analytics
 
     analytics: Optional[Dict[str, Any]] = None
 
+    engagement_over_time: List[dict] = Field(default_factory=list)
 
-    engagement_over_time: List[dict] = Field(
-        default_factory=list
-    )
-
-
-    post_performance: List[dict] = Field(
-        default_factory=list
-    )
-
+    post_performance: List[dict] = Field(default_factory=list)
 
     progress: float = 0.0
 
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================================
 # Campaign List Response
 # ==========================================================
+
 
 class CampaignListResponse(BaseModel):
 
@@ -181,15 +164,13 @@ class CampaignListResponse(BaseModel):
 
     campaigns: List[CampaignResponse]
 
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================================
 # Campaign Analytics
 # ==========================================================
+
 
 class CampaignAnalytics(BaseModel):
 
@@ -205,7 +186,6 @@ class CampaignAnalytics(BaseModel):
 
     status: str
 
-
     total_posts: int = 0
 
     published_posts: int = 0
@@ -216,7 +196,6 @@ class CampaignAnalytics(BaseModel):
 
     draft_posts: int = 0
 
-
     likes: int = 0
 
     shares: int = 0
@@ -225,32 +204,23 @@ class CampaignAnalytics(BaseModel):
 
     views: int = 0
 
-
     total_engagement: int = 0
 
     engagement_rate: float = 0.0
 
+    daily_performance: List[dict] = Field(default_factory=list)
 
-    daily_performance: List[dict] = Field(
-        default_factory=list
-    )
-
-    platform_breakdown: List[dict] = Field(
-        default_factory=list
-    )
-
+    platform_breakdown: List[dict] = Field(default_factory=list)
 
     period_days: int = 30
 
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================================
 # Campaign Performance Metrics
 # ==========================================================
+
 
 class CampaignPerformanceMetrics(BaseModel):
 
@@ -264,7 +234,6 @@ class CampaignPerformanceMetrics(BaseModel):
 
     cancelled_campaigns: int = 0
 
-
     total_likes: int = 0
 
     total_shares: int = 0
@@ -275,16 +244,10 @@ class CampaignPerformanceMetrics(BaseModel):
 
     total_engagement: int = 0
 
-
     average_engagement_per_campaign: float = 0.0
-
 
     best_performing_campaign: Optional[dict] = None
 
-
     period_days: int = 30
 
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)

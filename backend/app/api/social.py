@@ -1,3 +1,6 @@
+import secrets
+from app.core.config import settings
+from app.services.redis_client import get_redis
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -19,19 +22,38 @@ from app.schemas.social_account import (
 )
 
 from app.services.social_integration import SocialIntegrationService
+from app.services.social.x import XService
+from app.services.notification_service import NotificationService
 
 router = APIRouter(
     prefix="/api/social",
     tags=["Social Accounts"],
 )
 
-LINKEDIN_REDIRECT_URI = "http://localhost:8000/api/social/callback/linkedin"
+# --------------------------------------------------------
+# Separate, no-prefix router — ONLY for the YouTube OAuth
+# callback. Google Cloud Console has this registered as
+# http://localhost:8000/auth/youtube/callback, which does
+# NOT match the /api/social/callback/{platform} pattern
+# used by every other platform below. Re-registering it
+# would need the teammate who owns those credentials, so
+# this route matches what's already registered instead.
+# --------------------------------------------------------
+
+youtube_callback_router = APIRouter(tags=["Social Accounts"])
+
+REDIRECT_URIS = {
+    "linkedin": "http://localhost:8000/api/social/callback/linkedin",
+    "x": "http://localhost:8000/api/social/callback/x",
+    "facebook": "http://localhost:8000/api/social/callback/facebook",
+    "youtube": settings.YOUTUBE_REDIRECT_URI,
+}
 
 SUPPORTED_PLATFORMS = [
     "linkedin",
     "facebook",
     "instagram",
-    "twitter",
+    "x",
     "youtube",
 ]
 
@@ -44,22 +66,61 @@ SUPPORTED_PLATFORMS = [
 @router.get("/auth-url/{platform}", response_model=OAuthURLResponse)
 def get_oauth_url(
     platform: str,
-    redirect_uri: str = LINKEDIN_REDIRECT_URI,
     current_user: User = Depends(get_current_user),
 ):
 
-    if platform.lower() not in SUPPORTED_PLATFORMS:
+    platform = platform.lower()
+
+    if platform not in SUPPORTED_PLATFORMS:
         raise HTTPException(
             status_code=400,
             detail="Unsupported platform",
         )
 
+    redirect_uri = REDIRECT_URIS.get(platform)
+
+    if not redirect_uri:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No redirect URI configured for {platform}",
+        )
+
     service = SocialIntegrationService(None)
+
+    state = secrets.token_urlsafe(32)
+
+    redis = get_redis()
+
+    redis.setex(
+        f"oauth_state:{state}",
+        600,
+        str(current_user.id),
+    )
+
+    code_challenge = None
+
+    if platform == "x":
+
+        x_service = XService()
+
+        code_verifier, code_challenge = x_service.generate_pkce_pair()
+
+        redis.setex(
+            f"oauth_verifier:{state}",
+            600,
+            code_verifier,
+        )
 
     auth_url = service.get_oauth_url(
         platform=platform,
         redirect_uri=redirect_uri,
+        state=state,
+        code_challenge=code_challenge,
     )
+
+    if platform != "x":
+        separator = "&" if "?" in auth_url else "?"
+        auth_url = f"{auth_url}{separator}state={state}"
 
     return OAuthURLResponse(
         platform=platform,
@@ -83,26 +144,48 @@ def connect_social_account(
     db: Session = Depends(get_db),
 ):
 
+    platform = (
+        connect_data.platform.lower()
+        if isinstance(connect_data.platform, str)
+        else connect_data.platform.value
+    )
+
+    redirect_uri = connect_data.redirect_uri or REDIRECT_URIS.get(platform)
+
     service = SocialIntegrationService(db)
 
     result = service.connect_account(
-        platform=connect_data.platform,
+        platform=platform,
         auth_code=connect_data.auth_code,
         user_id=current_user.id,
-        redirect_uri=connect_data.redirect_uri or LINKEDIN_REDIRECT_URI,
+        redirect_uri=redirect_uri,
+        code_verifier=getattr(connect_data, "code_verifier", None),
+    )
+
+    NotificationService(db).create_notification(
+        user_id=current_user.id,
+        title="Account Connected",
+        description=f'Your {platform} account "{result["account_name"]}" was connected successfully.',
+        category="account",
+        notification_type="account_connected",
     )
 
     return OAuthCallbackResponse(
         success=True,
         message="Account connected successfully",
         account_id=result["id"],
-        platform=connect_data.platform,
+        platform=platform,
         account_name=result["account_name"],
     )
 
 
 # ---------------------------------------------------------
 # OAuth Callback
+# (LinkedIn, X, Facebook — all share the
+# /api/social/callback/{platform} pattern. YouTube's
+# callback is defined separately below, on
+# youtube_callback_router, since its registered redirect
+# URI doesn't match this pattern.)
 # ---------------------------------------------------------
 
 
@@ -110,25 +193,121 @@ def connect_social_account(
 def oauth_callback(
     platform: str,
     code: str,
+    state: str,
     db: Session = Depends(get_db),
 ):
+    platform = platform.lower()
+
+    redis = get_redis()
+
+    user_id = redis.get(f"oauth_state:{state}")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired OAuth state",
+        )
+
+    redis.delete(f"oauth_state:{state}")
+
+    code_verifier = None
+
+    if platform == "x":
+
+        code_verifier = redis.get(f"oauth_verifier:{state}")
+
+        if not code_verifier:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing or expired PKCE verifier",
+            )
+
+        redis.delete(f"oauth_verifier:{state}")
+
+    redirect_uri = REDIRECT_URIS.get(platform)
 
     service = SocialIntegrationService(db)
-
-    # Temporary user
-    # Replace later using OAuth state/session
 
     result = service.connect_account(
         platform=platform,
         auth_code=code,
-        user_id=1,
-        redirect_uri=LINKEDIN_REDIRECT_URI,
+        user_id=int(user_id),
+        redirect_uri=redirect_uri,
+        code_verifier=code_verifier,
+    )
+
+    NotificationService(db).create_notification(
+        user_id=int(user_id),
+        title="Account Connected",
+        description=f'Your {platform} account "{result["account_name"]}" was connected successfully.',
+        category="account",
+        notification_type="account_connected",
     )
 
     return {
         "success": True,
         "message": f"{platform} connected successfully",
         "account": result,
+        "user_id": int(user_id),
+    }
+
+
+# ---------------------------------------------------------
+# YouTube OAuth Callback (separate path)
+#
+# Registered in Google Cloud Console as:
+#   http://localhost:8000/auth/youtube/callback
+#
+# This lives on youtube_callback_router (no prefix, mounted
+# directly in main.py) specifically so the final path is
+# exactly /auth/youtube/callback — NOT /api/social/... —
+# matching what's already registered there.
+# ---------------------------------------------------------
+
+
+@youtube_callback_router.get("/auth/youtube/callback")
+def youtube_oauth_callback(
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+):
+
+    redis = get_redis()
+
+    user_id = redis.get(f"oauth_state:{state}")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired OAuth state",
+        )
+
+    redis.delete(f"oauth_state:{state}")
+
+    redirect_uri = REDIRECT_URIS.get("youtube")
+
+    service = SocialIntegrationService(db)
+
+    result = service.connect_account(
+        platform="youtube",
+        auth_code=code,
+        user_id=int(user_id),
+        redirect_uri=redirect_uri,
+    )
+
+    NotificationService(db).create_notification(
+        user_id=int(user_id),
+        title="Account Connected",
+        description=f'Your youtube account "{result["account_name"]}" was connected successfully.',
+        category="account",
+        notification_type="account_connected",
+    )
+
+    return {
+        "success": True,
+        "message": "youtube connected successfully",
+        "account": result,
+        "user_id": int(user_id),
     }
 
 
@@ -245,9 +424,9 @@ def available_platforms(
             "icon": "linkedin",
         },
         {
-            "platform": "twitter",
-            "name": "Twitter/X",
-            "icon": "twitter",
+            "platform": "x",
+            "name": "X",
+            "icon": "x",
         },
         {
             "platform": "youtube",
@@ -359,6 +538,14 @@ def disconnect_account(
     account.is_connected = False
 
     db.commit()
+
+    NotificationService(db).create_notification(
+        user_id=current_user.id,
+        title="Account Disconnected",
+        description=f"Your {account.platform} account was disconnected.",
+        category="account",
+        notification_type="account_disconnected",
+    )
 
     return {"message": "Account disconnected successfully"}
 

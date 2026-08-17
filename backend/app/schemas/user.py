@@ -51,6 +51,16 @@ class UserLogin(BaseModel):
 
 
 # ==================================================
+# Change Password
+# ==================================================
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+# ==================================================
 # Update Profile
 # ==================================================
 

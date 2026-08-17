@@ -16,6 +16,7 @@ class SocialPlatform(str, Enum):
     INSTAGRAM = "instagram"
     LINKEDIN = "linkedin"
     TWITTER = "twitter"
+    X = "x"
     YOUTUBE = "youtube"
     PINTEREST = "pinterest"
 
@@ -104,6 +105,8 @@ class SocialAccountConnect(BaseModel):
     auth_code: str
 
     redirect_uri: Optional[str] = None
+
+    code_verifier: Optional[str] = None
 
 
 # --------------------------------------

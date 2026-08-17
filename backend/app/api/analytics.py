@@ -38,55 +38,120 @@ def get_analytics_overview(
     ),
 ):
     """
-    Get analytics overview for the current user
+    Get real analytics overview for the current user.
+
+    Uses:
+    - ScheduledPost for post/status counts
+    - Latest PostAnalytics snapshot for each post
     """
+
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
+
+    # ==========================================================
+    # 1. GET POSTS FOR THE SELECTED PERIOD
+    # ==========================================================
 
     posts = (
         db.query(ScheduledPost)
         .filter(
             ScheduledPost.user_id == current_user.id,
             ScheduledPost.created_at >= start_date,
+            ScheduledPost.created_at <= end_date,
         )
         .all()
     )
 
-    post_ids = [p.id for p in posts]
-    analytics = (
-        db.query(PostAnalytics)
-        .filter(
-            PostAnalytics.user_id == current_user.id,
-            PostAnalytics.recorded_at >= start_date,
-            PostAnalytics.post_id.in_(post_ids) if post_ids else False,
-        )
-        .all()
-    )
+    # ==========================================================
+    # 2. POST STATUS COUNTS
+    # ==========================================================
 
     total_posts = len(posts)
-    published_posts = len([p for p in posts if p.status == "published"])
-    scheduled_posts = len([p for p in posts if p.status == "scheduled"])
-    failed_posts = len([p for p in posts if p.status == "failed"])
-    draft_posts = len([p for p in posts if p.status == "draft"])
-    pending_posts = len([p for p in posts if p.status == "pending_approval"])
 
-    total_likes = sum([a.likes for a in analytics])
-    total_shares = sum([a.shares for a in analytics])
-    total_comments = sum([a.comments for a in analytics])
-    total_views = sum([a.views for a in analytics])
+    published_posts = sum(1 for post in posts if post.status == "published")
+
+    scheduled_posts = sum(1 for post in posts if post.status == "scheduled")
+
+    failed_posts = sum(1 for post in posts if post.status == "failed")
+
+    draft_posts = sum(1 for post in posts if post.status == "draft")
+
+    pending_posts = sum(1 for post in posts if post.status == "pending_approval")
+
+    # ==========================================================
+    # 3. GET LATEST ANALYTICS SNAPSHOT FOR EACH POST
+    # ==========================================================
+
+    post_ids = [post.id for post in posts]
+
+    latest_analytics = []
+
+    if post_ids:
+        analytics_records = (
+            db.query(PostAnalytics)
+            .filter(
+                PostAnalytics.user_id == current_user.id,
+                PostAnalytics.post_id.in_(post_ids),
+                PostAnalytics.recorded_at >= start_date,
+                PostAnalytics.recorded_at <= end_date,
+            )
+            .order_by(PostAnalytics.post_id, desc(PostAnalytics.recorded_at))
+            .all()
+        )
+
+        # Keep only the newest snapshot for each post
+        seen_posts = set()
+
+        for record in analytics_records:
+            if record.post_id not in seen_posts:
+                latest_analytics.append(record)
+                seen_posts.add(record.post_id)
+
+    # ==========================================================
+    # 4. AGGREGATE REAL ANALYTICS
+    # ==========================================================
+
+    total_likes = sum(record.likes or 0 for record in latest_analytics)
+
+    total_shares = sum(record.shares or 0 for record in latest_analytics)
+
+    total_comments = sum(record.comments or 0 for record in latest_analytics)
+
+    total_views = sum(record.views or 0 for record in latest_analytics)
+
+    total_reach = sum(record.reach or 0 for record in latest_analytics)
+
     total_engagement = total_likes + total_shares + total_comments
 
-    engagement_rate = (total_engagement / total_views * 100) if total_views > 0 else 0
+    # ==========================================================
+    # 5. ENGAGEMENT RATE
+    # ==========================================================
+
+    engagement_rate = (total_engagement / total_views) * 100 if total_views > 0 else 0
+
+    # Average based on posts that actually have analytics
+    analytics_post_count = len(latest_analytics)
+
     average_engagement_per_post = (
-        total_engagement / published_posts if published_posts > 0 else 0
+        total_engagement / analytics_post_count if analytics_post_count > 0 else 0
     )
 
+    # ==========================================================
+    # 6. PLATFORM BREAKDOWN
+    # ==========================================================
+
     platform_stats = {}
+
     for post in posts:
         if post.platform not in platform_stats:
             platform_stats[post.platform] = 0
+
         if post.status == "published":
             platform_stats[post.platform] += 1
+
+    # ==========================================================
+    # 7. RETURN EXISTING RESPONSE SHAPE
+    # ==========================================================
 
     return AnalyticsOverview(
         total_posts=total_posts,
@@ -102,7 +167,9 @@ def get_analytics_overview(
         total_views=total_views,
         average_engagement_per_post=average_engagement_per_post,
         engagement_rate=engagement_rate,
-        total_reach=total_views,
+        # IMPORTANT:
+        # Use actual reach instead of views.
+        total_reach=total_reach,
         period_days=days,
         platform_breakdown=platform_stats,
     )
@@ -147,6 +214,11 @@ def get_audience_analytics(
     total_views = sum([a.views for a in analytics])
     total_engagement = total_likes + total_shares + total_comments
 
+    # NOTE: follower_growth and demographics below are simulated
+    # placeholder values, not real data. Nothing currently populates
+    # AudienceAnalytics with real follower counts pulled from platform
+    # APIs. Left as-is per your decision to treat this as a known demo
+    # placeholder rather than block on building a real sync job.
     follower_growth = []
     for i in range(days):
         date = start_date + timedelta(days=i)
@@ -360,6 +432,108 @@ def get_post_performance(
         )
 
     return results
+
+
+# =================================================
+# TOP / LOWEST PERFORMING POSTS
+# =================================================
+#
+# NOTE: these two routes MUST stay above
+# GET /posts/{post_id} below. FastAPI matches routes
+# top-to-bottom, so /posts/top would otherwise be
+# swallowed by /posts/{post_id} and fail trying to
+# parse "top" as an integer post_id.
+
+
+@router.get("/posts/top", response_model=List[PostPerformanceMetrics])
+def get_top_performing_posts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    days: Optional[int] = Query(30, ge=1, le=365),
+    limit: Optional[int] = Query(5, ge=1, le=50),
+):
+    """
+    Get the top-performing published posts by engagement
+    (likes + shares + comments), using each post's latest
+    analytics snapshot.
+    """
+    return _get_ranked_posts(current_user, db, days, limit, lowest=False)
+
+
+@router.get("/posts/lowest", response_model=List[PostPerformanceMetrics])
+def get_lowest_performing_posts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    days: Optional[int] = Query(30, ge=1, le=365),
+    limit: Optional[int] = Query(5, ge=1, le=50),
+):
+    """Same as above, sorted ascending instead of descending."""
+    return _get_ranked_posts(current_user, db, days, limit, lowest=True)
+
+
+def _get_ranked_posts(
+    current_user: User,
+    db: Session,
+    days: int,
+    limit: int,
+    lowest: bool,
+) -> List[PostPerformanceMetrics]:
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+
+    posts = (
+        db.query(ScheduledPost)
+        .filter(
+            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.status == "published",
+            ScheduledPost.published_at >= start_date,
+            ScheduledPost.published_at <= end_date,
+        )
+        .all()
+    )
+
+    scored = []
+    for post in posts:
+        analytics = (
+            db.query(PostAnalytics)
+            .filter(PostAnalytics.post_id == post.id)
+            .order_by(desc(PostAnalytics.recorded_at))
+            .first()
+        )
+        if not analytics:
+            # No analytics recorded for this post yet — skip it rather
+            # than showing it as a fake zero-engagement "worst" post
+            continue
+
+        engagement = analytics.likes + analytics.shares + analytics.comments
+        engagement_rate = (
+            (engagement / analytics.views * 100) if analytics.views > 0 else 0
+        )
+
+        scored.append(
+            (
+                engagement,
+                PostPerformanceMetrics(
+                    post_id=post.id,
+                    title=post.title,
+                    caption=post.caption,
+                    platform=post.platform,
+                    scheduled_time=post.scheduled_time,
+                    published_at=post.published_at,
+                    likes=analytics.likes,
+                    shares=analytics.shares,
+                    comments=analytics.comments,
+                    views=analytics.views,
+                    total_engagement=engagement,
+                    engagement_rate=engagement_rate,
+                    status=post.status,
+                    created_at=post.created_at,
+                ),
+            )
+        )
+
+    scored.sort(key=lambda x: x[0], reverse=not lowest)
+    return [p for _, p in scored[:limit]]
 
 
 # =================================================

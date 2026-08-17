@@ -1,5 +1,5 @@
 from app.services.celery_app import app
-
+from app.models.notification import Notification
 from app.services.queue import (
     get_due_posts,
     remove_from_queue,
@@ -10,14 +10,17 @@ from app.services.queue import (
 from app.services.logger import logger
 
 from app.core.database import SessionLocal
-from app.core.security import decrypt_token
+from app.core.security import decrypt_token, encrypt_token
 
 from app.models.scheduled_post import ScheduledPost
-from app.models.notification import Notification
 from app.models.social_account import SocialAccount
 from app.models.post_media import PostMedia
+from app.models.publish_log import PublishLog
 
 from app.services.social.linkedin import LinkedInService
+from app.services.social.x import XService
+from app.services.social.youtube import YouTubeService
+from app.services.notification_service import NotificationService
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -104,6 +107,8 @@ def publish_post(self, post_id: int):
 
             update_status(post_id, "processing")
 
+            remove_from_queue(post_id)
+
             account = (
                 db.query(SocialAccount)
                 .filter(
@@ -118,8 +123,6 @@ def publish_post(self, post_id: int):
 
             access_token = decrypt_token(account.access_token)
 
-            linkedin = LinkedInService()
-
             platform_post_id = None
             response = None
 
@@ -128,6 +131,8 @@ def publish_post(self, post_id: int):
             # ==================================================
 
             if post.platform.lower() == "linkedin":
+
+                linkedin = LinkedInService()
 
                 media_files = post.media_files
 
@@ -289,16 +294,175 @@ def publish_post(self, post_id: int):
                         media.media_type,
                     )
 
+                platform_post_id = response.get("id")
+
+                if not platform_post_id:
+                    raise Exception("LinkedIn post id missing")
+
+                post.published_url = (
+                    "https://www.linkedin.com/feed/update/" f"{platform_post_id}"
+                )
+
+            # ==================================================
+            # X (TWITTER)
+            # ==================================================
+
+            elif post.platform.lower() == "x":
+
+                x_service = XService()
+
+                media_files = post.media_files
+
+                # ==================================================
+                # TEXT POST
+                # ==================================================
+
+                if not media_files:
+
+                    response = x_service.publish_post(
+                        access_token,
+                        post.caption,
+                    )
+
+                # ==================================================
+                # MULTI-IMAGE POST (2-4 images/gif, X limit)
+                # ==================================================
+
+                elif len(media_files) > 1:
+
+                    if len(media_files) > 4:
+                        raise Exception("X supports a maximum of 4 images per post")
+
+                    file_paths = []
+
+                    for media in media_files:
+
+                        if media.media_type not in ["image", "gif"]:
+                            raise Exception(
+                                "X multi-media posts only support images/gifs"
+                            )
+
+                        file_path = get_local_media_path(media)
+
+                        if not Path(file_path).exists():
+                            raise Exception(f"Media file not found: {file_path}")
+
+                        file_paths.append(file_path)
+
+                    logger.info(
+                        f"[POST {post_id}] X uploading {len(file_paths)} images"
+                    )
+
+                    media_ids = x_service.upload_images(
+                        access_token,
+                        file_paths,
+                    )
+
+                    logger.info(f"[POST {post_id}] X images uploaded {media_ids}")
+
+                    response = x_service.publish_multi_image_post(
+                        access_token,
+                        post.caption,
+                        media_ids,
+                    )
+
+                # ==================================================
+                # SINGLE MEDIA (image, gif, or video)
+                # ==================================================
+
+                else:
+
+                    media = media_files[0]
+
+                    file_path = get_local_media_path(media)
+
+                    if not Path(file_path).exists():
+                        raise Exception(f"Media file not found: {file_path}")
+
+                    logger.info(f"[POST {post_id}] X media type {media.media_type}")
+
+                    if media.media_type in ["image", "gif"]:
+
+                        media_id = x_service.upload_image(
+                            access_token,
+                            file_path,
+                            media.media_type,
+                        )
+
+                    elif media.media_type == "video":
+
+                        media_id = x_service.upload_video(
+                            access_token,
+                            file_path,
+                        )
+
+                    else:
+
+                        raise Exception(
+                            f"X does not support media type {media.media_type}"
+                        )
+
+                    logger.info(f"[POST {post_id}] X media uploaded {media_id}")
+
+                    response = x_service.publish_media_post(
+                        access_token,
+                        post.caption,
+                        media_id,
+                    )
+
+                platform_post_id = response.get("data", {}).get("id")
+
+                if not platform_post_id:
+                    raise Exception("X post id missing")
+
+                post.published_url = (
+                    f"https://x.com/{account.account_name}/status/{platform_post_id}"
+                )
+
+            # ==================================================
+            # YOUTUBE
+            # ==================================================
+
+            elif post.platform.lower() == "youtube":
+
+                youtube_service = YouTubeService()
+
+                media_files = post.media_files
+
+                if not media_files:
+                    raise Exception("YouTube requires a video file")
+
+                media = media_files[0]
+
+                if media.media_type != "video":
+                    raise Exception("YouTube only supports video uploads")
+
+                file_path = get_local_media_path(media)
+
+                if not Path(file_path).exists():
+                    raise Exception(f"Media file not found: {file_path}")
+
+                logger.info(f"[POST {post_id}] Uploading video to YouTube")
+
+                response = youtube_service.publish_video(
+                    access_token,
+                    file_path,
+                    post.title,
+                    post.caption,
+                )
+
+                platform_post_id = response.get("id")
+
+                if not platform_post_id:
+                    raise Exception("YouTube video id missing")
+
+                post.published_url = f"https://youtube.com/watch?v={platform_post_id}"
+
             else:
 
                 raise Exception(f"{post.platform} not supported")
 
-            logger.info(f"[POST {post_id}] LinkedIn Response {response}")
-
-            platform_post_id = response.get("id")
-
-            if not platform_post_id:
-                raise Exception("LinkedIn post id missing")
+            logger.info(f"[POST {post_id}] {post.platform} Response {response}")
 
             # ==================================================
             # SUCCESS
@@ -308,25 +472,36 @@ def publish_post(self, post_id: int):
             post.published_at = datetime.now()
             post.platform_post_id = platform_post_id
 
-            post.published_url = (
-                "https://www.linkedin.com/feed/update/" f"{platform_post_id}"
-            )
-
             db.commit()
 
             remove_from_queue(post_id)
 
             update_status(post_id, "published")
 
+            NotificationService(db).create_notification(
+                user_id=post.user_id,
+                title="Post Published Successfully",
+                description=(
+                    f'Your post "{post.title}" was published '
+                    f"successfully on {post.platform}"
+                ),
+                category="publishing",
+                notification_type="post_published",
+            )
+
+            # --------------------------------------------------
+            # Publish log — success
+            # --------------------------------------------------
+
             db.add(
-                Notification(
-                    user_id=post.user_id,
-                    message=(
-                        f'Your post "{post.title}" '
-                        f"was published successfully on "
-                        f"{post.platform}"
-                    ),
-                    type="post_published",
+                PublishLog(
+                    scheduled_post_id=post.id,
+                    social_account_id=account.id,
+                    platform=post.platform,
+                    attempt_number=self.request.retries + 1,
+                    status="success",
+                    platform_post_id=platform_post_id,
+                    published_url=post.published_url,
                 )
             )
 
@@ -345,24 +520,45 @@ def publish_post(self, post_id: int):
 
             update_status(post_id, "failed")
 
+            # --------------------------------------------------
+            # Publish log — failure (logged every attempt)
+            # --------------------------------------------------
+
             db.add(
-                Notification(
-                    user_id=post.user_id,
-                    message=(
-                        f'Your post "{post.title}" '
-                        f"failed to publish on {post.platform}: {e}"
+                PublishLog(
+                    scheduled_post_id=post.id,
+                    social_account_id=(
+                        account.id if "account" in locals() and account else None
                     ),
-                    type="post_failed",
+                    platform=post.platform,
+                    attempt_number=self.request.retries + 1,
+                    status="failed",
+                    error_message=str(e),
                 )
             )
 
             db.commit()
 
-            try:
-                raise self.retry(exc=e, countdown=60)
-            except self.MaxRetriesExceededError:
+            if self.request.retries >= self.max_retries:
+
                 logger.error(f"[POST {post_id}] Max retries exceeded")
+
                 remove_from_queue(post_id)
+
+                NotificationService(db).create_notification(
+                    user_id=post.user_id,
+                    title="Post Publishing Failed",
+                    description=(
+                        f'Your post "{post.title}" failed to publish '
+                        f"on {post.platform}: {e}"
+                    ),
+                    category="publishing",
+                    notification_type="publishing_failed",
+                )
+
+            else:
+
+                raise self.retry(exc=e, countdown=60)
 
     finally:
 
@@ -451,7 +647,7 @@ def process_recurring_posts():
 
 # ==================================================
 # TASK 4
-# Token Expiry Notification
+# Automatic Token Refresh
 # ==================================================
 
 
@@ -467,23 +663,144 @@ def refresh_expiring_tokens():
         accounts = (
             db.query(SocialAccount)
             .filter(
+                SocialAccount.token_expires_at != None,
                 SocialAccount.token_expires_at <= expiry,
                 SocialAccount.is_active == True,
             )
             .all()
         )
 
+        logger.info(
+            f"[TOKEN REFRESH] Found {len(accounts)} " f"account(s) requiring refresh"
+        )
+
         for account in accounts:
 
-            db.add(
-                Notification(
-                    user_id=account.user_id,
-                    message=(f"Your {account.platform} " "connection needs attention."),
-                    type="token_expired",
-                )
-            )
+            try:
 
-        db.commit()
+                logger.info(
+                    f"[TOKEN REFRESH] Refreshing "
+                    f"{account.platform} account {account.id}"
+                )
+
+                # ----------------------------------------------
+                # Supported platforms
+                # ----------------------------------------------
+
+                if account.platform.lower() not in ["linkedin", "x", "youtube"]:
+
+                    logger.warning(
+                        f"[TOKEN REFRESH] Unsupported platform: " f"{account.platform}"
+                    )
+
+                    continue
+
+                # ----------------------------------------------
+                # Check refresh token
+                # ----------------------------------------------
+
+                if not account.refresh_token:
+
+                    logger.warning(
+                        f"[TOKEN REFRESH] Account {account.id} " f"has no refresh token"
+                    )
+
+                    NotificationService(db).create_notification(
+                        user_id=account.user_id,
+                        title="Account Reconnection Required",
+                        description=(
+                            f"Your {account.platform} connection needs to be "
+                            f"reconnected because no refresh token is available."
+                        ),
+                        category="account_activity",
+                        notification_type="reauthorization_required",
+                    )
+
+                    continue
+
+                # ----------------------------------------------
+                # Use SocialIntegrationService
+                # ----------------------------------------------
+
+                from app.services.social_integration import (
+                    SocialIntegrationService,
+                )
+
+                service = SocialIntegrationService(db)
+
+                token_data = service.refresh_token(
+                    platform=account.platform,
+                    refresh_token=account.refresh_token,
+                )
+
+                new_access_token = token_data.get("access_token")
+                new_refresh_token = token_data.get("refresh_token")
+                new_expiry = token_data.get("expiry")
+
+                if not new_access_token:
+
+                    raise Exception(
+                        f"No new access token returned from {account.platform}"
+                    )
+
+                account.access_token = encrypt_token(new_access_token)
+
+                if new_refresh_token:
+
+                    account.refresh_token = encrypt_token(new_refresh_token)
+
+                if new_expiry:
+
+                    account.token_expires_at = new_expiry
+
+                account.is_active = True
+                account.is_connected = True
+
+                db.commit()
+
+                logger.info(
+                    f"[TOKEN REFRESH] Successfully refreshed " f"account {account.id}"
+                )
+
+                NotificationService(db).create_notification(
+                    user_id=account.user_id,
+                    title="Account Reconnected",
+                    description=(
+                        f"Your {account.platform} connection was refreshed successfully."
+                    ),
+                    category="account_activity",
+                    notification_type="token_refreshed",
+                )
+
+            except Exception as e:
+
+                db.rollback()
+
+                logger.error(
+                    f"[TOKEN REFRESH] Failed for account " f"{account.id}: {e}"
+                )
+
+                try:
+
+                    NotificationService(db).create_notification(
+                        user_id=account.user_id,
+                        title="Reconnection Failed",
+                        description=(
+                            f"Your {account.platform} connection could not be "
+                            f"refreshed automatically. Please reconnect your account."
+                        ),
+                        category="account_activity",
+                        notification_type="token_expired",
+                    )
+
+                except Exception as notification_error:
+
+                    db.rollback()
+
+                    logger.error(
+                        f"[TOKEN REFRESH] Failed to create "
+                        f"notification: {notification_error}"
+                    )
 
     except Exception as e:
 

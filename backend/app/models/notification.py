@@ -13,13 +13,29 @@ class Notification(Base):
 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
+    # ---------------------------------------------
+    # Existing fields — unchanged, still used by
+    # tasks.py exactly as before
+    # ---------------------------------------------
+
     message = Column(Text, nullable=False)
 
     type = Column(String(50), nullable=False)
 
-    # Database column is INTEGER (0 = unread, 1 = read)
-    is_read = Column(Boolean, default=0)
+    is_read = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=func.now())
+
+    # ---------------------------------------------
+    # New fields — added for Module 7 spec
+    # ---------------------------------------------
+
+    title = Column(String(200), nullable=True)
+
+    category = Column(String(50), nullable=True)
+
+    delivery_channel = Column(String(20), nullable=False, default="in_app")
+
+    read_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="notifications")

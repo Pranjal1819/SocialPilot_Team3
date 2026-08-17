@@ -23,7 +23,99 @@ from app.schemas.campaign import (
     CampaignPerformanceMetrics,
 )
 
+from app.services.notification_service import NotificationService
+
 router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
+
+
+# ==========================================================
+# Helper — build a CampaignResponse with post/engagement metrics
+# ==========================================================
+
+
+def _build_campaign_response(db: Session, campaign: Campaign) -> CampaignResponse:
+
+    posts = (
+        db.query(ScheduledPost).filter(ScheduledPost.campaign_id == campaign.id).all()
+    )
+
+    analytics = (
+        db.query(PostAnalytics).filter(PostAnalytics.campaign_id == campaign.id).all()
+    )
+
+    published = len([p for p in posts if p.status == "published"])
+    failed = len([p for p in posts if p.status == "failed"])
+    drafts = len([p for p in posts if p.status == "draft"])
+
+    likes = sum(a.likes for a in analytics)
+    shares = sum(a.shares for a in analytics)
+    comments = sum(a.comments for a in analytics)
+    views = sum(a.views for a in analytics)
+
+    engagement = likes + shares + comments
+
+    return CampaignResponse(
+        id=campaign.id,
+        name=campaign.name,
+        description=campaign.description,
+        platform=campaign.platform,
+        start_date=campaign.start_date,
+        end_date=campaign.end_date,
+        status=campaign.status,
+        user_id=campaign.user_id,
+        created_at=campaign.created_at,
+        total_posts=len(posts),
+        published_posts=published,
+        failed_posts=failed,
+        draft_posts=drafts,
+        likes=likes,
+        shares=shares,
+        comments=comments,
+        views=views,
+        total_engagement=engagement,
+        engagement_rate=(engagement / views * 100 if views > 0 else 0),
+        engagement_metrics={
+            "likes": likes,
+            "shares": shares,
+            "comments": comments,
+            "views": views,
+        },
+    )
+
+
+# ==========================================================
+# Helper — fire the right notification for a status transition
+# ==========================================================
+
+
+def _notify_status_change(
+    db: Session, user_id: int, campaign: Campaign, previous_status: str
+):
+
+    new_status = campaign.status
+
+    if new_status == previous_status:
+        return
+
+    if new_status == "active":
+
+        NotificationService(db).create_notification(
+            user_id=user_id,
+            title="Campaign Started",
+            description=f'Your campaign "{campaign.name}" has started.',
+            category="campaigns",
+            notification_type="campaign_started",
+        )
+
+    elif new_status == "completed":
+
+        NotificationService(db).create_notification(
+            user_id=user_id,
+            title="Campaign Completed",
+            description=f'Your campaign "{campaign.name}" has been completed.',
+            category="campaigns",
+            notification_type="campaign_completed",
+        )
 
 
 # ==========================================================
@@ -68,195 +160,205 @@ def create_campaign(
     db.commit()
     db.refresh(db_campaign)
 
+    NotificationService(db).create_notification(
+        user_id=current_user.id,
+        title="Campaign Created",
+        description=f'Your campaign "{db_campaign.name}" was created successfully.',
+        category="campaigns",
+        notification_type="campaign_created",
+    )
+
     return db_campaign
 
 
 # ==========================================================
-# GET ALL CAMPAIGNS
+# UPDATE CAMPAIGN
 # ==========================================================
 
 
-@router.get("/", response_model=CampaignListResponse)
-def get_campaigns(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    platform: Optional[str] = None,
-    search: Optional[str] = None,
-    sort_by: str = "created_at",
-    sort_order: str = "desc",
-):
-
-    query = db.query(Campaign).filter(Campaign.user_id == current_user.id)
-
-    # Filters
-
-    if status:
-        query = query.filter(Campaign.status == status)
-
-    if platform:
-        query = query.filter(Campaign.platform == platform)
-
-    if search:
-
-        term = f"%{search}%"
-
-        query = query.filter(
-            or_(Campaign.name.ilike(term), Campaign.description.ilike(term))
-        )
-
-    # Sorting
-
-    sort_column = getattr(Campaign, sort_by, Campaign.created_at)
-
-    if sort_order == "asc":
-        query = query.order_by(asc(sort_column))
-
-    else:
-        query = query.order_by(desc(sort_column))
-
-    total = query.count()
-
-    campaigns = query.offset(skip).limit(limit).all()
-
-    result = []
-
-    for campaign in campaigns:
-
-        posts = (
-            db.query(ScheduledPost)
-            .filter(ScheduledPost.campaign_id == campaign.id)
-            .all()
-        )
-
-        analytics = (
-            db.query(PostAnalytics)
-            .filter(PostAnalytics.campaign_id == campaign.id)
-            .all()
-        )
-
-        published = len([p for p in posts if p.status == "published"])
-
-        failed = len([p for p in posts if p.status == "failed"])
-
-        drafts = len([p for p in posts if p.status == "draft"])
-
-        likes = sum(a.likes for a in analytics)
-
-        shares = sum(a.shares for a in analytics)
-
-        comments = sum(a.comments for a in analytics)
-
-        views = sum(a.views for a in analytics)
-
-        engagement = likes + shares + comments
-
-        result.append(
-            CampaignResponse(
-                id=campaign.id,
-                name=campaign.name,
-                description=campaign.description,
-                platform=campaign.platform,
-                start_date=campaign.start_date,
-                end_date=campaign.end_date,
-                status=campaign.status,
-                user_id=campaign.user_id,
-                created_at=campaign.created_at,
-                total_posts=len(posts),
-                published_posts=published,
-                failed_posts=failed,
-                draft_posts=drafts,
-                likes=likes,
-                shares=shares,
-                comments=comments,
-                views=views,
-                total_engagement=engagement,
-                engagement_rate=(engagement / views * 100 if views > 0 else 0),
-                engagement_metrics={
-                    "likes": likes,
-                    "shares": shares,
-                    "comments": comments,
-                    "views": views,
-                },
-            )
-        )
-
-    return CampaignListResponse(total=total, skip=skip, limit=limit, campaigns=result)
-    from fastapi import APIRouter, Depends, HTTPException, Query, status
-
-
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc, or_
-from datetime import datetime, timedelta
-from typing import Optional
-
-from app.core.database import get_db
-from app.core.dependencies import get_current_user
-
-from app.models.user import User
-from app.models.campaign import Campaign
-from app.models.scheduled_post import ScheduledPost
-from app.models.analytics import PostAnalytics
-
-from app.schemas.campaign import (
-    CampaignCreate,
-    CampaignUpdate,
-    CampaignResponse,
-    CampaignDetailResponse,
-    CampaignAnalytics,
-    CampaignListResponse,
-    CampaignStatusUpdate,
-    CampaignPerformanceMetrics,
-)
-
-router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
-
-
-# ==========================================================
-# CREATE CAMPAIGN
-# ==========================================================
-
-
-@router.post("/", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
-def create_campaign(
-    campaign: CampaignCreate,
+@router.put("/{campaign_id}", response_model=CampaignResponse)
+def update_campaign(
+    campaign_id: int,
+    update_data: CampaignUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
 
-    if campaign.start_date >= campaign.end_date:
-        raise HTTPException(
-            status_code=400, detail="Start date must be before end date"
-        )
-
-    existing = (
+    campaign = (
         db.query(Campaign)
-        .filter(Campaign.user_id == current_user.id, Campaign.name == campaign.name)
+        .filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
         .first()
     )
 
-    if existing:
-        raise HTTPException(
-            status_code=400, detail="Campaign with this name already exists"
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    update_fields = update_data.dict(exclude_unset=True)
+
+    if "start_date" in update_fields or "end_date" in update_fields:
+
+        new_start = update_fields.get("start_date", campaign.start_date)
+        new_end = update_fields.get("end_date", campaign.end_date)
+
+        if new_start >= new_end:
+            raise HTTPException(
+                status_code=400, detail="Start date must be before end date"
+            )
+
+    if update_data.name and update_data.name != campaign.name:
+
+        existing = (
+            db.query(Campaign)
+            .filter(
+                Campaign.user_id == current_user.id,
+                Campaign.name == update_data.name,
+                Campaign.id != campaign_id,
+            )
+            .first()
         )
 
-    db_campaign = Campaign(
-        name=campaign.name,
-        description=campaign.description,
-        platform=campaign.platform,
-        start_date=campaign.start_date,
-        end_date=campaign.end_date,
-        status="active",
+        if existing:
+            raise HTTPException(
+                status_code=400, detail="Campaign with this name already exists"
+            )
+
+    previous_status = campaign.status
+
+    # --------------------------------------------------
+    # Track marketing_team_id BEFORE it gets overwritten,
+    # so we know if this update is a fresh assignment
+    # --------------------------------------------------
+
+    previous_marketing_team_id = campaign.marketing_team_id
+
+    for key, value in update_fields.items():
+
+        # CampaignStatus is an Enum — store its .value on the
+        # plain string column
+        if key == "status" and value is not None:
+            setattr(campaign, key, value.value if hasattr(value, "value") else value)
+        else:
+            setattr(campaign, key, value)
+
+    db.commit()
+    db.refresh(campaign)
+
+    NotificationService(db).create_notification(
         user_id=current_user.id,
+        title="Campaign Updated",
+        description=f'Your campaign "{campaign.name}" was updated.',
+        category="campaigns",
+        notification_type="campaign_updated",
     )
 
-    db.add(db_campaign)
-    db.commit()
-    db.refresh(db_campaign)
+    if "status" in update_fields:
+        _notify_status_change(db, current_user.id, campaign, previous_status)
 
-    return db_campaign
+    # --------------------------------------------------
+    # Campaign Assigned — fires when marketing_team_id is
+    # newly set (was empty/different, now has a value)
+    # --------------------------------------------------
+
+    if (
+        "marketing_team_id" in update_fields
+        and campaign.marketing_team_id is not None
+        and campaign.marketing_team_id != previous_marketing_team_id
+    ):
+
+        NotificationService(db).create_notification(
+            user_id=campaign.marketing_team_id,
+            title="Campaign Assigned",
+            description=f'You were assigned to campaign "{campaign.name}".',
+            category="campaigns",
+            notification_type="campaign_assigned",
+        )
+
+    return _build_campaign_response(db, campaign)
+
+
+# ==========================================================
+# UPDATE CAMPAIGN STATUS
+# ==========================================================
+
+
+@router.patch("/{campaign_id}/status", response_model=CampaignResponse)
+def update_campaign_status(
+    campaign_id: int,
+    status_data: CampaignStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    campaign = (
+        db.query(Campaign)
+        .filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
+        .first()
+    )
+
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    previous_status = campaign.status
+
+    campaign.status = status_data.status.value
+
+    db.commit()
+    db.refresh(campaign)
+
+    _notify_status_change(db, current_user.id, campaign, previous_status)
+
+    return _build_campaign_response(db, campaign)
+
+
+# ==========================================================
+# DELETE CAMPAIGN
+# ==========================================================
+
+
+@router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_campaign(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    campaign = (
+        db.query(Campaign)
+        .filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
+        .first()
+    )
+
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    db.delete(campaign)
+    db.commit()
+
+    return None
+
+
+# ==========================================================
+# GET SINGLE CAMPAIGN
+# ==========================================================
+
+
+@router.get("/{campaign_id}", response_model=CampaignResponse)
+def get_campaign(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    campaign = (
+        db.query(Campaign)
+        .filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
+        .first()
+    )
+
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    return _build_campaign_response(db, campaign)
 
 
 # ==========================================================
@@ -279,8 +381,6 @@ def get_campaigns(
 
     query = db.query(Campaign).filter(Campaign.user_id == current_user.id)
 
-    # Filters
-
     if status:
         query = query.filter(Campaign.status == status)
 
@@ -295,13 +395,10 @@ def get_campaigns(
             or_(Campaign.name.ilike(term), Campaign.description.ilike(term))
         )
 
-    # Sorting
-
     sort_column = getattr(Campaign, sort_by, Campaign.created_at)
 
     if sort_order == "asc":
         query = query.order_by(asc(sort_column))
-
     else:
         query = query.order_by(desc(sort_column))
 
@@ -309,72 +406,12 @@ def get_campaigns(
 
     campaigns = query.offset(skip).limit(limit).all()
 
-    result = []
-
-    for campaign in campaigns:
-
-        posts = (
-            db.query(ScheduledPost)
-            .filter(ScheduledPost.campaign_id == campaign.id)
-            .all()
-        )
-
-        analytics = (
-            db.query(PostAnalytics)
-            .filter(PostAnalytics.campaign_id == campaign.id)
-            .all()
-        )
-
-        published = len([p for p in posts if p.status == "published"])
-
-        failed = len([p for p in posts if p.status == "failed"])
-
-        drafts = len([p for p in posts if p.status == "draft"])
-
-        likes = sum(a.likes for a in analytics)
-
-        shares = sum(a.shares for a in analytics)
-
-        comments = sum(a.comments for a in analytics)
-
-        views = sum(a.views for a in analytics)
-
-        engagement = likes + shares + comments
-
-        result.append(
-            CampaignResponse(
-                id=campaign.id,
-                name=campaign.name,
-                description=campaign.description,
-                platform=campaign.platform,
-                start_date=campaign.start_date,
-                end_date=campaign.end_date,
-                status=campaign.status,
-                user_id=campaign.user_id,
-                created_at=campaign.created_at,
-                total_posts=len(posts),
-                published_posts=published,
-                failed_posts=failed,
-                draft_posts=drafts,
-                likes=likes,
-                shares=shares,
-                comments=comments,
-                views=views,
-                total_engagement=engagement,
-                engagement_rate=(engagement / views * 100 if views > 0 else 0),
-                engagement_metrics={
-                    "likes": likes,
-                    "shares": shares,
-                    "comments": comments,
-                    "views": views,
-                },
-            )
-        )
+    result = [_build_campaign_response(db, campaign) for campaign in campaigns]
 
     return CampaignListResponse(total=total, skip=skip, limit=limit, campaigns=result)
-    # ==========================================================
 
 
+# ==========================================================
 # CAMPAIGN ANALYTICS
 # ==========================================================
 

@@ -170,6 +170,16 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    
+    # ==================================================
+    # Login Devices
+    # ==================================================
+
+    login_devices = relationship(
+        "LoginDevice",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     # ==================================================
     # Business Assignment

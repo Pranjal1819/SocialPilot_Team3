@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
-
+from app.api.publishing import router as publishing_router
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 
