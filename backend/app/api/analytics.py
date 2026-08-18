@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
+import random
+
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -121,6 +123,8 @@ def get_analytics_overview(
 
     total_reach = sum(record.reach or 0 for record in latest_analytics)
 
+    total_impressions = sum(record.impressions or 0 for record in latest_analytics)
+
     total_engagement = total_likes + total_shares + total_comments
 
     # ==========================================================
@@ -143,11 +147,18 @@ def get_analytics_overview(
     platform_stats = {}
 
     for post in posts:
-        if post.platform not in platform_stats:
-            platform_stats[post.platform] = 0
+        # Normalize casing — a data inconsistency in ScheduledPost.platform
+        # (e.g. "Youtube" vs "youtube" on different rows) was splitting the
+        # same platform into two separate breakdown entries. Grouping by
+        # lowercase key fixes the count without needing to touch the
+        # underlying stored value on each row.
+        platform_key = (post.platform or "unknown").lower()
+
+        if platform_key not in platform_stats:
+            platform_stats[platform_key] = 0
 
         if post.status == "published":
-            platform_stats[post.platform] += 1
+            platform_stats[platform_key] += 1
 
     # ==========================================================
     # 7. RETURN EXISTING RESPONSE SHAPE
@@ -170,6 +181,7 @@ def get_analytics_overview(
         # IMPORTANT:
         # Use actual reach instead of views.
         total_reach=total_reach,
+        total_impressions=total_impressions,
         period_days=days,
         platform_breakdown=platform_stats,
     )
@@ -214,27 +226,45 @@ def get_audience_analytics(
     total_views = sum([a.views for a in analytics])
     total_engagement = total_likes + total_shares + total_comments
 
-    # NOTE: follower_growth and demographics below are simulated
-    # placeholder values, not real data. Nothing currently populates
-    # AudienceAnalytics with real follower counts pulled from platform
-    # APIs. Left as-is per your decision to treat this as a known demo
-    # placeholder rather than block on building a real sync job.
+    # NOTE: demographics/geographic_distribution below are still
+    # simulated placeholder values — no per-platform demographic data
+    # source exists to mock those against. total_followers and
+    # follower_growth now anchor to SocialAccount.followers_count
+    # (populated via seed-mock-account-stats) instead of an unrelated
+    # made-up formula, so this endpoint and the Reports module show
+    # consistent follower numbers for the same user.
+    total_followers = (
+        db.query(func.sum(SocialAccount.followers_count))
+        .filter(
+            SocialAccount.user_id == current_user.id,
+            SocialAccount.is_active == True,
+        )
+        .scalar()
+        or 0
+    )
+
     follower_growth = []
     for i in range(days):
         date = start_date + timedelta(days=i)
-        base_followers = 100
-        growth_rate = 1.02
-        followers = int(base_followers * (growth_rate**i))
+        # Backfill a plausible growth curve ending at the real
+        # (mocked) current total, rather than a fixed base/rate that
+        # has no relationship to the actual follower count.
+        progress = (i + 1) / days
+        followers_on_date = int(total_followers * progress)
         follower_growth.append(
             {
                 "date": date.strftime("%Y-%m-%d"),
-                "followers": followers,
-                "new_followers": int(followers * 0.05) if i > 0 else 0,
+                "followers": followers_on_date,
+                "new_followers": (
+                    followers_on_date - follower_growth[-1]["followers"]
+                    if follower_growth
+                    else 0
+                ),
             }
         )
 
     return AudienceAnalytics(
-        total_followers=follower_growth[-1]["followers"] if follower_growth else 0,
+        total_followers=total_followers,
         follower_growth=follower_growth,
         demographics={
             "age_18_24": 30,
@@ -280,9 +310,14 @@ def get_platform_analytics(
 
     platforms_dict = {}
     for post in posts:
-        if post.platform not in platforms_dict:
-            platforms_dict[post.platform] = {
-                "platform": post.platform,
+        # Same normalization as get_analytics_overview above — group by
+        # lowercase platform so casing inconsistencies in stored data
+        # don't split one platform into two entries.
+        platform_key = (post.platform or "unknown").lower()
+
+        if platform_key not in platforms_dict:
+            platforms_dict[platform_key] = {
+                "platform": platform_key,
                 "total_posts": 0,
                 "published_posts": 0,
                 "scheduled_posts": 0,
@@ -291,17 +326,17 @@ def get_platform_analytics(
                 "post_ids": [],
             }
 
-        platforms_dict[post.platform]["total_posts"] += 1
+        platforms_dict[platform_key]["total_posts"] += 1
         if post.status == "published":
-            platforms_dict[post.platform]["published_posts"] += 1
+            platforms_dict[platform_key]["published_posts"] += 1
         elif post.status == "scheduled":
-            platforms_dict[post.platform]["scheduled_posts"] += 1
+            platforms_dict[platform_key]["scheduled_posts"] += 1
         elif post.status == "failed":
-            platforms_dict[post.platform]["failed_posts"] += 1
+            platforms_dict[platform_key]["failed_posts"] += 1
         elif post.status == "draft":
-            platforms_dict[post.platform]["draft_posts"] += 1
+            platforms_dict[platform_key]["draft_posts"] += 1
 
-        platforms_dict[post.platform]["post_ids"].append(post.id)
+        platforms_dict[platform_key]["post_ids"].append(post.id)
 
     results = []
     for platform, data in platforms_dict.items():
@@ -537,7 +572,7 @@ def _get_ranked_posts(
 
 
 # =================================================
-# RECORD POST ANALYTICS
+# RECORD POST ANALYTICS (manual insert — unchanged)
 # =================================================
 
 
@@ -592,6 +627,241 @@ def record_post_analytics(
     db.refresh(record)
 
     return record
+
+
+# =================================================
+# MOCK ANALYTICS DATA (per your decision — real API
+# calls to Instagram/YouTube have been removed here.
+# Test accounts have no real audience, so real numbers
+# were all zero/empty anyway. This generates plausible-
+# looking fake engagement instead, for demo purposes.)
+# =================================================
+
+
+def _generate_mock_analytics(platform: str) -> dict:
+    """
+    Generates randomized but internally-consistent fake engagement
+    numbers (comments/shares/saves scaled off likes, likes scaled off
+    reach, etc.) so the numbers look plausible together rather than
+    being independently random. Not based on any real data source —
+    purely for demo purposes.
+    """
+
+    reach = random.randint(50, 5000)
+    impressions = int(reach * random.uniform(1.1, 2.5))
+    views = int(reach * random.uniform(0.8, 1.3))
+    likes = int(reach * random.uniform(0.02, 0.12))
+    comments = int(likes * random.uniform(0.05, 0.25))
+    shares = int(likes * random.uniform(0.02, 0.15))
+    saves = int(likes * random.uniform(0.05, 0.3))
+    clicks = int(impressions * random.uniform(0.01, 0.06))
+
+    return {
+        "likes": likes,
+        "shares": shares,
+        "comments": comments,
+        "views": views,
+        "reach": reach,
+        "impressions": impressions,
+        "clicks": clicks,
+        "saves": saves,
+    }
+
+
+@router.post("/posts/{post_id}/sync", response_model=PostAnalyticsResponse)
+def sync_post_analytics(
+    post_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a mock analytics snapshot for a post and record it.
+    Real platform API calls were removed here per your decision —
+    test accounts have no real audience, so real numbers were
+    consistently zero. Works for any platform, not just Instagram.
+    """
+
+    post = (
+        db.query(ScheduledPost)
+        .filter(ScheduledPost.id == post_id, ScheduledPost.user_id == current_user.id)
+        .first()
+    )
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post.status != "published":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Post must be published to sync analytics (current status: {post.status})",
+        )
+
+    metrics = _generate_mock_analytics(post.platform)
+
+    record = PostAnalytics(
+        post_id=post.id,
+        campaign_id=post.campaign_id,
+        user_id=current_user.id,
+        platform=(post.platform or "unknown").lower(),
+        likes=metrics["likes"],
+        shares=metrics["shares"],
+        comments=metrics["comments"],
+        views=metrics["views"],
+        reach=metrics["reach"],
+        impressions=metrics["impressions"],
+        clicks=metrics["clicks"],
+        saves=metrics["saves"],
+    )
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return record
+
+
+@router.post("/seed-mock-data")
+def seed_mock_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    only_missing: bool = Query(
+        True, description="Only seed posts that have no analytics rows yet"
+    ),
+):
+    """
+    Backfills a mock PostAnalytics snapshot for every published post
+    belonging to the current user. Skips posts that already have at
+    least one analytics row unless only_missing=false is passed.
+    """
+
+    posts = (
+        db.query(ScheduledPost)
+        .filter(
+            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.status == "published",
+        )
+        .all()
+    )
+
+    seeded_post_ids = []
+    skipped_post_ids = []
+
+    for post in posts:
+
+        if only_missing:
+            existing = (
+                db.query(PostAnalytics).filter(PostAnalytics.post_id == post.id).first()
+            )
+            if existing:
+                skipped_post_ids.append(post.id)
+                continue
+
+        metrics = _generate_mock_analytics(post.platform)
+
+        record = PostAnalytics(
+            post_id=post.id,
+            campaign_id=post.campaign_id,
+            user_id=current_user.id,
+            platform=(post.platform or "unknown").lower(),
+            likes=metrics["likes"],
+            shares=metrics["shares"],
+            comments=metrics["comments"],
+            views=metrics["views"],
+            reach=metrics["reach"],
+            impressions=metrics["impressions"],
+            clicks=metrics["clicks"],
+            saves=metrics["saves"],
+        )
+
+        db.add(record)
+        seeded_post_ids.append(post.id)
+
+    db.commit()
+
+    return {
+        "seeded_post_ids": seeded_post_ids,
+        "skipped_post_ids": skipped_post_ids,
+        "total_seeded": len(seeded_post_ids),
+        "total_skipped": len(skipped_post_ids),
+    }
+
+
+# =================================================
+# MOCK ACCOUNT-LEVEL STATS (followers/following/posts)
+# =================================================
+#
+# SocialAccount.followers_count / following_count /
+# total_posts are real DB columns but nothing populates
+# them yet — they sit at 0. Reports' Audience Growth and
+# Platform Comparison builders both read these directly,
+# so without this they'd show 0 followers regardless of
+# the PostAnalytics mock data above.
+
+
+def _generate_mock_account_stats() -> dict:
+    """
+    Plausible fake follower/following/post counts. Not based on any
+    real data source — for demo purposes only.
+    """
+
+    followers = random.randint(200, 50000)
+    following = random.randint(50, min(followers, 2000))
+    total_posts = random.randint(5, 300)
+
+    return {
+        "followers_count": followers,
+        "following_count": following,
+        "total_posts": total_posts,
+    }
+
+
+@router.post("/seed-mock-account-stats")
+def seed_mock_account_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    only_missing: bool = Query(
+        True, description="Only seed accounts currently at 0 followers"
+    ),
+):
+    """
+    Backfills mock followers_count/following_count/total_posts on
+    every active SocialAccount for the current user.
+    """
+
+    accounts = (
+        db.query(SocialAccount)
+        .filter(
+            SocialAccount.user_id == current_user.id,
+            SocialAccount.is_active == True,
+        )
+        .all()
+    )
+
+    seeded_account_ids = []
+    skipped_account_ids = []
+
+    for account in accounts:
+
+        if only_missing and (account.followers_count or 0) > 0:
+            skipped_account_ids.append(account.id)
+            continue
+
+        stats = _generate_mock_account_stats()
+
+        account.followers_count = stats["followers_count"]
+        account.following_count = stats["following_count"]
+        account.total_posts = stats["total_posts"]
+
+        seeded_account_ids.append(account.id)
+
+    db.commit()
+
+    return {
+        "seeded_account_ids": seeded_account_ids,
+        "skipped_account_ids": skipped_account_ids,
+        "total_seeded": len(seeded_account_ids),
+        "total_skipped": len(skipped_account_ids),
+    }
 
 
 @router.get("/posts/{post_id}", response_model=PostAnalyticsResponse)

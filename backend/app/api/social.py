@@ -1,7 +1,11 @@
 import secrets
+
 from app.core.config import settings
 from app.services.redis_client import get_redis
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
+
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -25,29 +29,58 @@ from app.services.social_integration import SocialIntegrationService
 from app.services.social.x import XService
 from app.services.notification_service import NotificationService
 
+
+# =========================================================
+# Router
+# =========================================================
+
 router = APIRouter(
     prefix="/api/social",
     tags=["Social Accounts"],
 )
 
-# --------------------------------------------------------
-# Separate, no-prefix router — ONLY for the YouTube OAuth
-# callback. Google Cloud Console has this registered as
-# http://localhost:8000/auth/youtube/callback, which does
-# NOT match the /api/social/callback/{platform} pattern
-# used by every other platform below. Re-registering it
-# would need the teammate who owns those credentials, so
-# this route matches what's already registered instead.
-# --------------------------------------------------------
 
-youtube_callback_router = APIRouter(tags=["Social Accounts"])
+# =========================================================
+# Separate OAuth Callback Routers
+#
+# YouTube:
+# /auth/youtube/callback
+#
+# Instagram:
+# /auth/instagram/callback
+# =========================================================
+
+youtube_callback_router = APIRouter(
+    tags=["Social Accounts"]
+)
+
+instagram_callback_router = APIRouter(
+    tags=["Social Accounts"]
+)
+
+
+# =========================================================
+# Redirect URIs
+# =========================================================
 
 REDIRECT_URIS = {
     "linkedin": "http://localhost:8000/api/social/callback/linkedin",
+
+    # Existing routes — DO NOT CHANGE
     "x": "http://localhost:8000/api/social/callback/x",
     "facebook": "http://localhost:8000/api/social/callback/facebook",
+
+    # Existing YouTube URI
     "youtube": settings.YOUTUBE_REDIRECT_URI,
+
+    # Instagram ngrok URI from .env
+    "instagram": settings.INSTAGRAM_REDIRECT_URI,
 }
+
+
+# =========================================================
+# Supported Platforms
+# =========================================================
 
 SUPPORTED_PLATFORMS = [
     "linkedin",
@@ -58,12 +91,61 @@ SUPPORTED_PLATFORMS = [
 ]
 
 
-# ---------------------------------------------------------
+# =========================================================
+# Frontend Redirect Configuration
+# =========================================================
+
+FRONTEND_BASE_URL = "http://localhost:3000"
+
+ROLE_ACCOUNTS_PATH = {
+    "content_creator": "/content-creator/accounts",
+    "business_user": "/business-owner/accounts",
+}
+
+
+def get_accounts_redirect(
+    role: str,
+    error: str = None,
+    platform: str = None,
+):
+    """
+    Redirect the user back to the appropriate SocialPilot
+    accounts page after OAuth completion.
+    """
+
+    path = ROLE_ACCOUNTS_PATH.get(
+        role,
+        "/content-creator/accounts",
+    )
+
+    url = f"{FRONTEND_BASE_URL}{path}"
+
+    if error:
+        separator = "?" if "?" not in url else "&"
+
+        url += (
+            f"{separator}"
+            f"error={error}"
+            f"&platform={platform}"
+        )
+
+    # IMPORTANT:
+    # Always return RedirectResponse, including
+    # successful OAuth completion.
+    return RedirectResponse(
+        url=url,
+        status_code=302,
+    )
+
+
+# =========================================================
 # Generate OAuth URL
-# ---------------------------------------------------------
+# =========================================================
 
-
-@router.get("/auth-url/{platform}", response_model=OAuthURLResponse)
+@router.get(
+    "/auth-url/{platform}",
+    response_model=OAuthURLResponse,
+)
 def get_oauth_url(
     platform: str,
     current_user: User = Depends(get_current_user),
@@ -87,6 +169,10 @@ def get_oauth_url(
 
     service = SocialIntegrationService(None)
 
+    # -----------------------------------------------------
+    # Generate OAuth state
+    # -----------------------------------------------------
+
     state = secrets.token_urlsafe(32)
 
     redis = get_redis()
@@ -97,19 +183,29 @@ def get_oauth_url(
         str(current_user.id),
     )
 
+    # -----------------------------------------------------
+    # X PKCE
+    # -----------------------------------------------------
+
     code_challenge = None
 
     if platform == "x":
 
         x_service = XService()
 
-        code_verifier, code_challenge = x_service.generate_pkce_pair()
+        code_verifier, code_challenge = (
+            x_service.generate_pkce_pair()
+        )
 
         redis.setex(
             f"oauth_verifier:{state}",
             600,
             code_verifier,
         )
+
+    # -----------------------------------------------------
+    # Generate OAuth URL
+    # -----------------------------------------------------
 
     auth_url = service.get_oauth_url(
         platform=platform,
@@ -118,9 +214,22 @@ def get_oauth_url(
         code_challenge=code_challenge,
     )
 
+    # X service already handles state.
+    # Other platforms need state appended here.
+
     if platform != "x":
-        separator = "&" if "?" in auth_url else "?"
-        auth_url = f"{auth_url}{separator}state={state}"
+
+        separator = (
+            "&"
+            if "?" in auth_url
+            else "?"
+        )
+
+        auth_url = (
+            f"{auth_url}"
+            f"{separator}"
+            f"state={state}"
+        )
 
     return OAuthURLResponse(
         platform=platform,
@@ -129,10 +238,11 @@ def get_oauth_url(
     )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Connect Account
-# ---------------------------------------------------------
-
+#
+# Manual/API-based connection endpoint.
+# =========================================================
 
 @router.post(
     "/connect",
@@ -150,7 +260,10 @@ def connect_social_account(
         else connect_data.platform.value
     )
 
-    redirect_uri = connect_data.redirect_uri or REDIRECT_URIS.get(platform)
+    redirect_uri = (
+        connect_data.redirect_uri
+        or REDIRECT_URIS.get(platform)
+    )
 
     service = SocialIntegrationService(db)
 
@@ -159,13 +272,21 @@ def connect_social_account(
         auth_code=connect_data.auth_code,
         user_id=current_user.id,
         redirect_uri=redirect_uri,
-        code_verifier=getattr(connect_data, "code_verifier", None),
+        code_verifier=getattr(
+            connect_data,
+            "code_verifier",
+            None,
+        ),
     )
 
     NotificationService(db).create_notification(
         user_id=current_user.id,
         title="Account Connected",
-        description=f'Your {platform} account "{result["account_name"]}" was connected successfully.',
+        description=(
+            f'Your {platform} account '
+            f'"{result["account_name"]}" '
+            f'was connected successfully.'
+        ),
         category="account",
         notification_type="account_connected",
     )
@@ -179,93 +300,222 @@ def connect_social_account(
     )
 
 
-# ---------------------------------------------------------
-# OAuth Callback
-# (LinkedIn, X, Facebook — all share the
-# /api/social/callback/{platform} pattern. YouTube's
-# callback is defined separately below, on
-# youtube_callback_router, since its registered redirect
-# URI doesn't match this pattern.)
-# ---------------------------------------------------------
+# =========================================================
+# Generic OAuth Callback
+#
+# LinkedIn
+# X
+# Facebook
+#
+# LinkedIn redirects to SocialPilot frontend.
+# X/Facebook retain JSON behavior for now.
+# =========================================================
 
-
-@router.get("/callback/{platform}")
+@router.get(
+    "/callback/{platform}"
+)
 def oauth_callback(
     platform: str,
     code: str,
     state: str,
     db: Session = Depends(get_db),
 ):
+
     platform = platform.lower()
 
     redis = get_redis()
 
-    user_id = redis.get(f"oauth_state:{state}")
+    # -----------------------------------------------------
+    # Validate OAuth state
+    # -----------------------------------------------------
+
+    user_id = redis.get(
+        f"oauth_state:{state}"
+    )
 
     if not user_id:
+
+        if platform == "linkedin":
+
+            return get_accounts_redirect(
+                "content_creator",
+                error="invalid_state",
+                platform=platform,
+            )
+
         raise HTTPException(
             status_code=400,
             detail="Invalid or expired OAuth state",
         )
 
-    redis.delete(f"oauth_state:{state}")
+    redis.delete(
+        f"oauth_state:{state}"
+    )
+
+    # -----------------------------------------------------
+    # Get user
+    # -----------------------------------------------------
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == int(user_id)
+        )
+        .first()
+    )
+
+    role = (
+        user.role
+        if user
+        else "content_creator"
+    )
+
+    # -----------------------------------------------------
+    # X PKCE
+    # -----------------------------------------------------
 
     code_verifier = None
 
     if platform == "x":
 
-        code_verifier = redis.get(f"oauth_verifier:{state}")
+        code_verifier = redis.get(
+            f"oauth_verifier:{state}"
+        )
 
         if not code_verifier:
+
             raise HTTPException(
                 status_code=400,
                 detail="Missing or expired PKCE verifier",
             )
 
-        redis.delete(f"oauth_verifier:{state}")
+        redis.delete(
+            f"oauth_verifier:{state}"
+        )
 
-    redirect_uri = REDIRECT_URIS.get(platform)
+    # -----------------------------------------------------
+    # Redirect URI
+    # -----------------------------------------------------
+
+    redirect_uri = REDIRECT_URIS.get(
+        platform
+    )
+
+    if not redirect_uri:
+
+        if platform == "linkedin":
+
+            return get_accounts_redirect(
+                role,
+                error="missing_redirect_uri",
+                platform=platform,
+            )
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No redirect URI configured "
+                f"for {platform}"
+            ),
+        )
 
     service = SocialIntegrationService(db)
 
-    result = service.connect_account(
-        platform=platform,
-        auth_code=code,
-        user_id=int(user_id),
-        redirect_uri=redirect_uri,
-        code_verifier=code_verifier,
-    )
+    # -----------------------------------------------------
+    # Connect Account
+    # -----------------------------------------------------
+
+    try:
+
+        result = service.connect_account(
+            platform=platform,
+            auth_code=code,
+            user_id=int(user_id),
+            redirect_uri=redirect_uri,
+            code_verifier=code_verifier,
+        )
+
+    except Exception as e:
+
+        print(
+            f"{platform} OAuth connection failed:",
+            e,
+        )
+
+        if platform == "linkedin":
+
+            return get_accounts_redirect(
+                role,
+                error="connection_failed",
+                platform=platform,
+            )
+
+        raise HTTPException(
+            status_code=400,
+            detail=f"{platform} connection failed",
+        )
+
+    # -----------------------------------------------------
+    # Notification
+    # -----------------------------------------------------
 
     NotificationService(db).create_notification(
         user_id=int(user_id),
         title="Account Connected",
-        description=f'Your {platform} account "{result["account_name"]}" was connected successfully.',
+        description=(
+            f'Your {platform} account '
+            f'"{result["account_name"]}" '
+            f'was connected successfully.'
+        ),
         category="account",
         notification_type="account_connected",
     )
 
+    # -----------------------------------------------------
+    # LinkedIn → SocialPilot frontend
+    # -----------------------------------------------------
+
+    if platform == "linkedin":
+
+        return get_accounts_redirect(
+            role
+        )
+
+    # -----------------------------------------------------
+    # X / Facebook
+    #
+    # Existing JSON response preserved.
+    # -----------------------------------------------------
+
     return {
         "success": True,
-        "message": f"{platform} connected successfully",
+        "message": (
+            f"{platform} connected successfully"
+        ),
         "account": result,
         "user_id": int(user_id),
     }
 
 
-# ---------------------------------------------------------
-# YouTube OAuth Callback (separate path)
+# =========================================================
+# YouTube OAuth Callback
 #
-# Registered in Google Cloud Console as:
-#   http://localhost:8000/auth/youtube/callback
+# Existing registered URI:
 #
-# This lives on youtube_callback_router (no prefix, mounted
-# directly in main.py) specifically so the final path is
-# exactly /auth/youtube/callback — NOT /api/social/... —
-# matching what's already registered there.
-# ---------------------------------------------------------
+# http://localhost:8000/auth/youtube/callback
+#
+# Flow:
+#
+# YouTube
+#    ↓
+# FastAPI
+#    ↓
+# SocialPilot frontend
+# =========================================================
 
-
-@youtube_callback_router.get("/auth/youtube/callback")
+@youtube_callback_router.get(
+    "/auth/youtube/callback"
+)
 def youtube_oauth_callback(
     code: str,
     state: str,
@@ -274,47 +524,252 @@ def youtube_oauth_callback(
 
     redis = get_redis()
 
-    user_id = redis.get(f"oauth_state:{state}")
+    # -----------------------------------------------------
+    # Validate state
+    # -----------------------------------------------------
+
+    user_id = redis.get(
+        f"oauth_state:{state}"
+    )
 
     if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or expired OAuth state",
+
+        return get_accounts_redirect(
+            "content_creator",
+            error="invalid_state",
+            platform="youtube",
         )
 
-    redis.delete(f"oauth_state:{state}")
+    redis.delete(
+        f"oauth_state:{state}"
+    )
 
-    redirect_uri = REDIRECT_URIS.get("youtube")
+    # -----------------------------------------------------
+    # Get user
+    # -----------------------------------------------------
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == int(user_id)
+        )
+        .first()
+    )
+
+    role = (
+        user.role
+        if user
+        else "content_creator"
+    )
+
+    # -----------------------------------------------------
+    # Redirect URI
+    # -----------------------------------------------------
+
+    redirect_uri = REDIRECT_URIS.get(
+        "youtube"
+    )
+
+    if not redirect_uri:
+
+        return get_accounts_redirect(
+            role,
+            error="missing_redirect_uri",
+            platform="youtube",
+        )
 
     service = SocialIntegrationService(db)
 
-    result = service.connect_account(
-        platform="youtube",
-        auth_code=code,
-        user_id=int(user_id),
-        redirect_uri=redirect_uri,
-    )
+    # -----------------------------------------------------
+    # Connect YouTube Account
+    # -----------------------------------------------------
+
+    try:
+
+        result = service.connect_account(
+            platform="youtube",
+            auth_code=code,
+            user_id=int(user_id),
+            redirect_uri=redirect_uri,
+        )
+
+    except Exception as e:
+
+        print(
+            "YouTube OAuth connection failed:",
+            e,
+        )
+
+        return get_accounts_redirect(
+            role,
+            error="connection_failed",
+            platform="youtube",
+        )
+
+    # -----------------------------------------------------
+    # Notification
+    # -----------------------------------------------------
 
     NotificationService(db).create_notification(
         user_id=int(user_id),
         title="Account Connected",
-        description=f'Your youtube account "{result["account_name"]}" was connected successfully.',
+        description=(
+            f'Your YouTube account '
+            f'"{result["account_name"]}" '
+            f'was connected successfully.'
+        ),
         category="account",
         notification_type="account_connected",
     )
 
-    return {
-        "success": True,
-        "message": "youtube connected successfully",
-        "account": result,
-        "user_id": int(user_id),
-    }
+    # -----------------------------------------------------
+    # Redirect to SocialPilot
+    # -----------------------------------------------------
+
+    return get_accounts_redirect(
+        role
+    )
 
 
-# ---------------------------------------------------------
+# =========================================================
+# Instagram OAuth Callback
+#
+# Registered URI:
+#
+# https://<your-ngrok-domain>/auth/instagram/callback
+#
+# Flow:
+#
+# Instagram
+#    ↓
+# ngrok
+#    ↓
+# FastAPI
+#    ↓
+# SocialPilot frontend
+# =========================================================
+
+@instagram_callback_router.get(
+    "/auth/instagram/callback"
+)
+def instagram_oauth_callback(
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+):
+
+    redis = get_redis()
+
+    # -----------------------------------------------------
+    # Validate OAuth state
+    # -----------------------------------------------------
+
+    user_id = redis.get(
+        f"oauth_state:{state}"
+    )
+
+    if not user_id:
+
+        return get_accounts_redirect(
+            "content_creator",
+            error="invalid_state",
+            platform="instagram",
+        )
+
+    redis.delete(
+        f"oauth_state:{state}"
+    )
+
+    # -----------------------------------------------------
+    # Get user
+    # -----------------------------------------------------
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == int(user_id)
+        )
+        .first()
+    )
+
+    role = (
+        user.role
+        if user
+        else "content_creator"
+    )
+
+    # -----------------------------------------------------
+    # Instagram Redirect URI
+    # -----------------------------------------------------
+
+    redirect_uri = REDIRECT_URIS.get(
+        "instagram"
+    )
+
+    if not redirect_uri:
+
+        return get_accounts_redirect(
+            role,
+            error="missing_redirect_uri",
+            platform="instagram",
+        )
+
+    service = SocialIntegrationService(db)
+
+    # -----------------------------------------------------
+    # Connect Instagram Account
+    # -----------------------------------------------------
+
+    try:
+
+        result = service.connect_account(
+            platform="instagram",
+            auth_code=code,
+            user_id=int(user_id),
+            redirect_uri=redirect_uri,
+        )
+
+    except Exception as e:
+
+        print(
+            "Instagram OAuth connection failed:",
+            e,
+        )
+
+        return get_accounts_redirect(
+            role,
+            error="connection_failed",
+            platform="instagram",
+        )
+
+    # -----------------------------------------------------
+    # Notification
+    # -----------------------------------------------------
+
+    NotificationService(db).create_notification(
+        user_id=int(user_id),
+        title="Account Connected",
+        description=(
+            f'Your Instagram account '
+            f'"{result["account_name"]}" '
+            f'was connected successfully.'
+        ),
+        category="account",
+        notification_type="account_connected",
+    )
+
+    # -----------------------------------------------------
+    # Redirect to SocialPilot
+    # -----------------------------------------------------
+
+    return get_accounts_redirect(
+        role
+    )
+
+
+# =========================================================
 # Get All Accounts
-# ---------------------------------------------------------
-
+# =========================================================
 
 @router.get(
     "/accounts",
@@ -335,10 +790,9 @@ def get_social_accounts(
     )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Summary
-# ---------------------------------------------------------
-
+# =========================================================
 
 @router.get(
     "/accounts/summary",
@@ -359,10 +813,9 @@ def get_summary(
     )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Single Account
-# ---------------------------------------------------------
-
+# =========================================================
 
 @router.get(
     "/accounts/{account_id}",
@@ -385,6 +838,7 @@ def get_account(
     )
 
     if not account:
+
         raise HTTPException(
             status_code=404,
             detail="Account not found",
@@ -393,10 +847,9 @@ def get_account(
     return account
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Available Platforms
-# ---------------------------------------------------------
-
+# =========================================================
 
 @router.get(
     "/platforms",
@@ -449,7 +902,11 @@ def available_platforms(
     for platform in platforms:
 
         account = next(
-            (a for a in accounts if a.platform == platform["platform"]),
+            (
+                a
+                for a in accounts
+                if a.platform == platform["platform"]
+            ),
             None,
         )
 
@@ -459,17 +916,20 @@ def available_platforms(
                 name=platform["name"],
                 icon=platform["icon"],
                 is_connected=account is not None,
-                account_name=(account.account_name if account else None),
+                account_name=(
+                    account.account_name
+                    if account
+                    else None
+                ),
             )
         )
 
     return result
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Update Account
-# ---------------------------------------------------------
-
+# =========================================================
 
 @router.put(
     "/accounts/{account_id}",
@@ -492,14 +952,21 @@ def update_account(
     )
 
     if not account:
+
         raise HTTPException(
             status_code=404,
             detail="Account not found",
         )
 
-    for key, value in update_data.dict(exclude_unset=True).items():
+    for key, value in update_data.dict(
+        exclude_unset=True
+    ).items():
 
-        setattr(account, key, value)
+        setattr(
+            account,
+            key,
+            value,
+        )
 
     db.commit()
     db.refresh(account)
@@ -507,12 +974,13 @@ def update_account(
     return account
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Disconnect
-# ---------------------------------------------------------
+# =========================================================
 
-
-@router.delete("/accounts/{account_id}")
+@router.delete(
+    "/accounts/{account_id}"
+)
 def disconnect_account(
     account_id: int,
     current_user: User = Depends(get_current_user),
@@ -529,6 +997,7 @@ def disconnect_account(
     )
 
     if not account:
+
         raise HTTPException(
             status_code=404,
             detail="Account not found",
@@ -542,20 +1011,26 @@ def disconnect_account(
     NotificationService(db).create_notification(
         user_id=current_user.id,
         title="Account Disconnected",
-        description=f"Your {account.platform} account was disconnected.",
+        description=(
+            f"Your {account.platform} account "
+            f"was disconnected."
+        ),
         category="account",
         notification_type="account_disconnected",
     )
 
-    return {"message": "Account disconnected successfully"}
+    return {
+        "message": "Account disconnected successfully"
+    }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # Refresh Token
-# ---------------------------------------------------------
+# =========================================================
 
-
-@router.post("/accounts/{account_id}/refresh-token")
+@router.post(
+    "/accounts/{account_id}/refresh-token"
+)
 def refresh_token(
     account_id: int,
     current_user: User = Depends(get_current_user),
@@ -573,12 +1048,14 @@ def refresh_token(
     )
 
     if not account:
+
         raise HTTPException(
             status_code=404,
             detail="Account not found",
         )
 
     if not account.refresh_token:
+
         raise HTTPException(
             status_code=400,
             detail="No refresh token available",
@@ -596,4 +1073,6 @@ def refresh_token(
 
     db.commit()
 
-    return {"message": "Token refreshed successfully"}
+    return {
+        "message": "Token refreshed successfully"
+    }

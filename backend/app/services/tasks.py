@@ -20,6 +20,7 @@ from app.models.publish_log import PublishLog
 from app.services.social.linkedin import LinkedInService
 from app.services.social.x import XService
 from app.services.social.youtube import YouTubeService
+from app.services.social.instagram import InstagramService
 from app.services.notification_service import NotificationService
 
 from datetime import datetime, timedelta
@@ -27,6 +28,26 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from PIL import Image
+
+# ==================================================
+# Errors
+# ==================================================
+
+
+class PermanentPublishError(Exception):
+    """
+    Raised for failures that will never succeed on retry, no matter
+    how many times the task is re-run: unsupported platform, missing
+    media files, invalid media type, validation failures, inactive
+    account, etc.
+
+    These are marked failed immediately and skip the retry/backoff
+    path entirely, instead of burning max_retries * countdown time
+    on something that cannot self-resolve.
+    """
+
+    pass
+
 
 # ==================================================
 # Convert media URL to local path
@@ -119,18 +140,31 @@ def publish_post(self, post_id: int):
             )
 
             if not account:
-                raise Exception("Social account inactive")
+                raise PermanentPublishError("Social account inactive")
 
             access_token = decrypt_token(account.access_token)
 
             platform_post_id = None
             response = None
 
+            # --------------------------
+            # Normalize platform value
+            #
+            # .lower() alone doesn't catch stray whitespace or typos
+            # in the stored value, which would silently fall through
+            # to the "not supported" branch below even for platforms
+            # that ARE implemented. Strip + lower here, and log the
+            # raw repr if we end up in the else branch so mismatches
+            # are diagnosable from the logs.
+            # --------------------------
+
+            platform = (post.platform or "").strip().lower()
+
             # ==================================================
             # LINKEDIN
             # ==================================================
 
-            if post.platform.lower() == "linkedin":
+            if platform == "linkedin":
 
                 linkedin = LinkedInService()
 
@@ -158,7 +192,9 @@ def publish_post(self, post_id: int):
                     logger.info(f"[POST {post_id}] Carousel processing started")
 
                     if len(media_files) < 2:
-                        raise Exception("Carousel requires minimum 2 media files")
+                        raise PermanentPublishError(
+                            "Carousel requires minimum 2 media files"
+                        )
 
                     carousel_images = []
 
@@ -173,14 +209,16 @@ def publish_post(self, post_id: int):
                         for media in media_files:
 
                             if media.media_type not in ["image", "gif"]:
-                                raise Exception(
+                                raise PermanentPublishError(
                                     "LinkedIn carousel supports only images"
                                 )
 
                             file_path = get_local_media_path(media)
 
                             if not Path(file_path).exists():
-                                raise Exception(f"Media file not found: {file_path}")
+                                raise PermanentPublishError(
+                                    f"Media file not found: {file_path}"
+                                )
 
                             img = Image.open(file_path)
 
@@ -190,7 +228,9 @@ def publish_post(self, post_id: int):
                             carousel_images.append(img)
 
                         if not carousel_images:
-                            raise Exception("No valid carousel images found")
+                            raise PermanentPublishError(
+                                "No valid carousel images found"
+                            )
 
                         first_image = carousel_images[0]
                         remaining_images = carousel_images[1:]
@@ -259,12 +299,16 @@ def publish_post(self, post_id: int):
                     ]
 
                     if media.media_type not in supported_types:
-                        raise Exception(f"Unsupported media type {media.media_type}")
+                        raise PermanentPublishError(
+                            f"Unsupported media type {media.media_type}"
+                        )
 
                     file_path = get_local_media_path(media)
 
                     if not Path(file_path).exists():
-                        raise Exception(f"Media file not found: {file_path}")
+                        raise PermanentPublishError(
+                            f"Media file not found: {file_path}"
+                        )
 
                     logger.info(f"[POST {post_id}] Media type {media.media_type}")
 
@@ -307,7 +351,7 @@ def publish_post(self, post_id: int):
             # X (TWITTER)
             # ==================================================
 
-            elif post.platform.lower() == "x":
+            elif platform == "x":
 
                 x_service = XService()
 
@@ -331,21 +375,25 @@ def publish_post(self, post_id: int):
                 elif len(media_files) > 1:
 
                     if len(media_files) > 4:
-                        raise Exception("X supports a maximum of 4 images per post")
+                        raise PermanentPublishError(
+                            "X supports a maximum of 4 images per post"
+                        )
 
                     file_paths = []
 
                     for media in media_files:
 
                         if media.media_type not in ["image", "gif"]:
-                            raise Exception(
+                            raise PermanentPublishError(
                                 "X multi-media posts only support images/gifs"
                             )
 
                         file_path = get_local_media_path(media)
 
                         if not Path(file_path).exists():
-                            raise Exception(f"Media file not found: {file_path}")
+                            raise PermanentPublishError(
+                                f"Media file not found: {file_path}"
+                            )
 
                         file_paths.append(file_path)
 
@@ -377,7 +425,9 @@ def publish_post(self, post_id: int):
                     file_path = get_local_media_path(media)
 
                     if not Path(file_path).exists():
-                        raise Exception(f"Media file not found: {file_path}")
+                        raise PermanentPublishError(
+                            f"Media file not found: {file_path}"
+                        )
 
                     logger.info(f"[POST {post_id}] X media type {media.media_type}")
 
@@ -398,7 +448,7 @@ def publish_post(self, post_id: int):
 
                     else:
 
-                        raise Exception(
+                        raise PermanentPublishError(
                             f"X does not support media type {media.media_type}"
                         )
 
@@ -423,24 +473,24 @@ def publish_post(self, post_id: int):
             # YOUTUBE
             # ==================================================
 
-            elif post.platform.lower() == "youtube":
+            elif platform == "youtube":
 
                 youtube_service = YouTubeService()
 
                 media_files = post.media_files
 
                 if not media_files:
-                    raise Exception("YouTube requires a video file")
+                    raise PermanentPublishError("YouTube requires a video file")
 
                 media = media_files[0]
 
                 if media.media_type != "video":
-                    raise Exception("YouTube only supports video uploads")
+                    raise PermanentPublishError("YouTube only supports video uploads")
 
                 file_path = get_local_media_path(media)
 
                 if not Path(file_path).exists():
-                    raise Exception(f"Media file not found: {file_path}")
+                    raise PermanentPublishError(f"Media file not found: {file_path}")
 
                 logger.info(f"[POST {post_id}] Uploading video to YouTube")
 
@@ -458,9 +508,63 @@ def publish_post(self, post_id: int):
 
                 post.published_url = f"https://youtube.com/watch?v={platform_post_id}"
 
+            # ==================================================
+            # INSTAGRAM
+            #
+            # Instagram's Graph API fetches media directly from a
+            # PUBLIC URL (two-step: create container, then publish) —
+            # unlike LinkedIn/X/YouTube it does NOT accept a local
+            # file upload, so we pass media.media_url as-is instead
+            # of resolving it through get_local_media_path().
+            # ==================================================
+
+            elif platform == "instagram":
+
+                instagram_service = InstagramService()
+
+                media_files = post.media_files
+
+                if not media_files:
+                    raise PermanentPublishError(
+                        "Instagram requires at least one media item"
+                    )
+
+                media = media_files[0]
+
+                if media.media_type not in ["image", "video"]:
+                    raise PermanentPublishError(
+                        f"Instagram does not support media type {media.media_type}"
+                    )
+
+                ig_media_type = "REELS" if media.media_type == "video" else "IMAGE"
+
+                logger.info(
+                    f"[POST {post_id}] Publishing to Instagram as {ig_media_type}"
+                )
+
+                response = instagram_service.publish_media(
+                    access_token,
+                    account.account_id,
+                    media.media_url,
+                    post.caption,
+                    ig_media_type,
+                )
+
+                platform_post_id = response.get("id")
+
+                if not platform_post_id:
+                    raise Exception("Instagram post id missing")
+
+                post.published_url = f"https://www.instagram.com/p/{platform_post_id}/"
+
             else:
 
-                raise Exception(f"{post.platform} not supported")
+                logger.error(
+                    f"[POST {post_id}] Unrecognized platform value: "
+                    f"{post.platform!r} (normalized: {platform!r})"
+                )
+
+                raise PermanentPublishError(f"{post.platform} not supported")
 
             logger.info(f"[POST {post_id}] {post.platform} Response {response}")
 
@@ -539,9 +643,21 @@ def publish_post(self, post_id: int):
 
             db.commit()
 
-            if self.request.retries >= self.max_retries:
+            # --------------------------------------------------
+            # Permanent failures never succeed on retry — fail
+            # immediately instead of burning max_retries * countdown
+            # on something that cannot self-resolve (unsupported
+            # platform, missing files, invalid media types, etc).
+            # --------------------------------------------------
 
-                logger.error(f"[POST {post_id}] Max retries exceeded")
+            is_permanent = isinstance(e, PermanentPublishError)
+
+            if is_permanent or self.request.retries >= self.max_retries:
+
+                if is_permanent:
+                    logger.error(f"[POST {post_id}] Permanent failure, not retrying")
+                else:
+                    logger.error(f"[POST {post_id}] Max retries exceeded")
 
                 remove_from_queue(post_id)
 

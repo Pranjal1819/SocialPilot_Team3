@@ -1,11 +1,58 @@
 # app/schemas/scheduled_post.py
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 
 from app.models.enums import ContentType, MEDIA_REQUIRED_CONTENT_TYPES
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def parse_scheduled_time(value):
+    """
+    Accepts scheduled_time as either:
+      - 12-hour format: "2026-08-18 10:45 AM" or "2026-08-18 10:45:00 AM"
+      - Standard ISO format: "2026-08-18T10:45:00" or "...Z" (UTC)
+    Returns a datetime object either way.
+    """
+
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, str):
+
+        for fmt in ("%Y-%m-%d %I:%M %p", "%Y-%m-%d %I:%M:%S %p"):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+
+        # Fall back to ISO parsing (handles "...T...:00" and "...Z")
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    return value
+
+
+def normalize_to_ist(dt: datetime) -> datetime:
+    """
+    Ensures scheduled_time always represents IST wall-clock time,
+    stored as a naive datetime (matching this server's local clock,
+    which is IST — see tasks.py's datetime.now() comparisons).
+
+    - Naive input (no tzinfo) is assumed to ALREADY be IST wall-clock
+      time, exactly as the user picked it — no conversion.
+    - Timezone-aware input (e.g. a "...Z" / UTC string) is converted
+      to IST, then stripped of tzinfo, so it still compares cleanly
+      against the naive datetime.now() used elsewhere.
+    """
+
+    if dt.tzinfo is None:
+        return dt
+
+    return dt.astimezone(IST).replace(tzinfo=None)
+
 
 # --------------------------------------
 # Post Status Enum
@@ -76,6 +123,11 @@ class ScheduledPostBase(BaseModel):
     # Exact social account to publish with
     social_account_id: int
 
+    @field_validator("scheduled_time", mode="before")
+    @classmethod
+    def parse_time(cls, value):
+        return parse_scheduled_time(value)
+
 
 # --------------------------------------
 # Create Post
@@ -86,8 +138,23 @@ class ScheduledPostCreate(ScheduledPostBase):
 
     media: Optional[List[PostMediaItem]] = None
 
+    status: PostStatus = PostStatus.SCHEDULED
+
+    @model_validator(mode="after")
+    def normalize_scheduled_time(self):
+
+        self.scheduled_time = normalize_to_ist(self.scheduled_time)
+
+        return self
+
     @model_validator(mode="after")
     def validate_media_for_content_type(self):
+
+        if self.status not in (PostStatus.DRAFT, PostStatus.SCHEDULED):
+
+            raise ValueError(
+                "status on create must be 'draft' or 'scheduled'"
+            )
 
         if self.content_type in MEDIA_REQUIRED_CONTENT_TYPES and not self.media:
 
@@ -129,6 +196,23 @@ class ScheduledPostUpdate(BaseModel):
     social_account_id: Optional[int] = None
 
     status: Optional[PostStatus] = None
+
+    @field_validator("scheduled_time", mode="before")
+    @classmethod
+    def parse_time(cls, value):
+
+        if value is None:
+            return value
+
+        return parse_scheduled_time(value)
+
+    @model_validator(mode="after")
+    def normalize_scheduled_time(self):
+
+        if self.scheduled_time is not None:
+            self.scheduled_time = normalize_to_ist(self.scheduled_time)
+
+        return self
 
 
 # --------------------------------------

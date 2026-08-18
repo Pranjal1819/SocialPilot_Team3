@@ -442,7 +442,18 @@ def logout(current_user: User = Depends(get_current_user)):
 def refresh_token(current_user: User = Depends(get_current_user)):
 
     token = create_access_token(
-        data={"sub": current_user.email, "user_id": current_user.id}
+        data={
+            "sub": current_user.email,
+            "user_id": current_user.id,
+            "role": current_user.role,
+        }
     )
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+    }

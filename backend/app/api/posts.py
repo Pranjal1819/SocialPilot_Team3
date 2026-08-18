@@ -103,7 +103,7 @@ def create_post(
         content_type=post.content_type.value,
         platform=post.platform,
         scheduled_time=post.scheduled_time,
-        status="scheduled",
+        status=post.status.value,
     )
 
     db.add(db_post)
@@ -139,7 +139,7 @@ def create_post(
     # Add Redis Queue
     # ---------------------------------------------
 
-    if db_post.scheduled_time:
+    if db_post.scheduled_time and db_post.status == "scheduled":
 
         add_to_queue(db_post.id, db_post.scheduled_time.timestamp())
 
@@ -214,16 +214,49 @@ def get_calendar(
             calendar_data[date_key].append(
                 {
                     "id": post.id,
+                    "title": post.title,
                     "content": post.caption[:50] if post.caption else "",
                     "platform": post.platform,
                     "status": post.status,
                     "social_account_id": post.social_account_id,
+                    "campaign_id": post.campaign_id,
                     "scheduled_time": post.scheduled_time,
                 }
             )
 
     return calendar_data
 
+    return calendar_data
+
+
+# =================================================
+# GET SINGLE POST
+# =================================================
+
+
+@router.get("/{post_id}", response_model=ScheduledPostResponse)
+def get_post(
+    post_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    db_post = (
+        db.query(ScheduledPost)
+        .filter(ScheduledPost.id == post_id, ScheduledPost.user_id == current_user.id)
+        .first()
+    )
+
+    if not db_post:
+
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    return db_post
+
+
+# =================================================
+# UPDATE POST
+# =================================================
 
 # =================================================
 # UPDATE POST
@@ -288,15 +321,15 @@ def update_post(
 
             db.add(
                 PostMedia(
-                  post_id=db_post.id,
-                  media_url=item.media_url,
-                  file_path=item.file_path,
-                  media_type=item.media_type,
-                  thumbnail_url=item.thumbnail_url,
-                  mime_type=item.mime_type,
-                  file_size=item.file_size,
-                  duration=item.duration,
-                  display_order=item.display_order or idx,
+                    post_id=db_post.id,
+                    media_url=item.media_url,
+                    file_path=item.file_path,
+                    media_type=item.media_type,
+                    thumbnail_url=item.thumbnail_url,
+                    mime_type=item.mime_type,
+                    file_size=item.file_size,
+                    duration=item.duration,
+                    display_order=item.display_order or idx,
                 )
             )
 

@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     YOUTUBE_CLIENT_ID: str
     YOUTUBE_CLIENT_SECRET: str
     YOUTUBE_REDIRECT_URI: str
-
+    INSTAGRAM_CLIENT_ID: str
+    INSTAGRAM_CLIENT_SECRET: str
+    INSTAGRAM_REDIRECT_URI: str
     ENCRYPTION_KEY: str
     SECRET_KEY: str
     DEBUG: bool

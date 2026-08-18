@@ -7,6 +7,7 @@ from app.services.social.linkedin import LinkedInService
 from app.services.social.x import XService
 from app.services.social.youtube import YouTubeService
 from app.core.security import encrypt_token, decrypt_token
+from app.services.social.instagram import InstagramService
 
 
 class SocialIntegrationService:
@@ -30,6 +31,9 @@ class SocialIntegrationService:
 
         if platform == "youtube":
             return YouTubeService()
+
+        if platform == "instagram":
+            return InstagramService()
 
         raise Exception(f"Unsupported platform: {platform}")
 
@@ -97,6 +101,9 @@ class SocialIntegrationService:
                 user_data.get("name") or user_data.get("username") or "X User"
             )
             account_id = user_data.get("id")
+        elif platform == "instagram":
+            account_name = profile.get("username") or "Instagram User"
+            account_id = profile.get("id")
         else:
             account_name = (
                 profile.get("name")

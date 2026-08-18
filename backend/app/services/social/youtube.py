@@ -20,6 +20,7 @@ class YouTubeService:
             "scope": (
                 "https://www.googleapis.com/auth/youtube.upload "
                 "https://www.googleapis.com/auth/youtube.readonly "
+                "https://www.googleapis.com/auth/yt-analytics.readonly "
                 "openid email profile"
             ),
             "access_type": "offline",
@@ -191,3 +192,35 @@ class YouTubeService:
             )
 
         return upload_response.json()
+    
+        # ==================================================
+    # ANALYTICS (real data — requires yt-analytics.readonly
+    # scope, granted on this account as of the latest
+    # reconnect)
+    # ==================================================
+
+    def get_channel_analytics(self, access_token, start_date, end_date):
+
+        response = requests.get(
+            "https://youtubeanalytics.googleapis.com/v2/reports",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={
+                "ids": "channel==MINE",
+                "startDate": start_date,
+                "endDate": end_date,
+                "metrics": "views,likes,comments,shares,estimatedMinutesWatched,subscribersGained,subscribersLost",
+                "dimensions": "day",
+            },
+            timeout=15,
+        )
+
+        print("YouTube Analytics Status:", response.status_code)
+        print("YouTube Analytics Response:", response.text)
+
+        if not response.ok:
+            raise Exception(
+                f"YouTube analytics request failed: "
+                f"{response.status_code} - {response.text}"
+            )
+
+        return response.json()
