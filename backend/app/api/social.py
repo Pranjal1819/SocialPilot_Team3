@@ -1,4 +1,5 @@
 import secrets
+from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.services.redis_client import get_redis
@@ -64,7 +65,7 @@ instagram_callback_router = APIRouter(
 # =========================================================
 
 REDIRECT_URIS = {
-    "linkedin": "http://localhost:8000/api/social/callback/linkedin",
+    "linkedin": settings.LINKEDIN_REDIRECT_URI,
 
     # Existing routes — DO NOT CHANGE
     "x": "http://localhost:8000/api/social/callback/x",
@@ -88,6 +89,7 @@ SUPPORTED_PLATFORMS = [
     "instagram",
     "x",
     "youtube",
+    "pinterest",
 ]
 
 
@@ -100,6 +102,9 @@ FRONTEND_BASE_URL = "http://localhost:3000"
 ROLE_ACCOUNTS_PATH = {
     "content_creator": "/content-creator/accounts",
     "business_user": "/business-owner/accounts",
+    "business_owner": "/business-owner/accounts",
+    "marketing_team": "/marketing-team/clients",
+    "administrator": "/administrator",
 }
 
 
@@ -316,12 +321,19 @@ def connect_social_account(
 )
 def oauth_callback(
     platform: str,
-    code: str,
-    state: str,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
 
     platform = platform.lower()
+
+    if error:
+        return get_accounts_redirect("content_creator", error=error, platform=platform)
+
+    if not code or not state:
+        return get_accounts_redirect("content_creator", error="missing_oauth_parameters", platform=platform)
 
     redis = get_redis()
 
@@ -517,10 +529,14 @@ def oauth_callback(
     "/auth/youtube/callback"
 )
 def youtube_oauth_callback(
-    code: str,
-    state: str,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
+
+    if error or not code or not state:
+        return get_accounts_redirect("content_creator", error=error or "missing_oauth_parameters", platform="youtube")
 
     redis = get_redis()
 
@@ -653,10 +669,14 @@ def youtube_oauth_callback(
     "/auth/instagram/callback"
 )
 def instagram_oauth_callback(
-    code: str,
-    state: str,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
+
+    if error or not code or not state:
+        return get_accounts_redirect("content_creator", error=error or "missing_oauth_parameters", platform="instagram")
 
     redis = get_redis()
 

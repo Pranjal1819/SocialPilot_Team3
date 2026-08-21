@@ -61,7 +61,7 @@ def get_current_user(
 def get_current_admin(
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role != "administrator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Administrator access required",
@@ -129,7 +129,7 @@ def get_current_content_creator(
 def get_marketing_or_admin(
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in ["marketing_team", "admin"]:
+    if current_user.role not in ["marketing_team", "administrator"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Marketing Team or Administrator access required",
@@ -146,7 +146,7 @@ def get_marketing_or_admin(
 def get_business_or_admin(
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in ["business_user", "admin"]:
+    if current_user.role not in ["business_user", "administrator"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Business User or Administrator access required",

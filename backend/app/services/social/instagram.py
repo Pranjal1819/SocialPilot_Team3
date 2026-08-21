@@ -15,19 +15,17 @@ class InstagramService:
 
         scopes = (
             "instagram_business_basic,"
-            "instagram_business_content_publish,"
-            "instagram_business_manage_comments,"
-            "instagram_business_manage_insights,"
-            "instagram_business_manage_messages"
+            "instagram_business_content_publish"
         )
 
-        return (
-            "https://www.instagram.com/oauth/authorize"
-            f"?client_id={settings.INSTAGRAM_CLIENT_ID}"
-            f"&redirect_uri={redirect_uri}"
-            f"&response_type=code"
-            f"&scope={scopes}"
-        )
+        from urllib.parse import urlencode
+
+        return "https://www.instagram.com/oauth/authorize?" + urlencode({
+            "client_id": settings.INSTAGRAM_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes,
+        })
 
     # ==================================================
     # Exchange Authorization Code for Tokens

@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.campaign import Campaign
 from app.models.scheduled_post import ScheduledPost
 from app.models.analytics import PostAnalytics
+from app.models.business_assignment import BusinessAssignment
 
 from app.schemas.campaign import (
     CampaignCreate,
@@ -26,6 +27,60 @@ from app.schemas.campaign import (
 from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
+
+
+# ==========================================================
+# Helper — resolve the effective business-user scope for the
+# current user.
+#
+# - business_user: scope is their own id
+# - marketing_team: requires business_owner_id and verifies the
+#   team is assigned to that business user (403 otherwise)
+# - administrator: may pass business_owner_id to view any client
+# ==========================================================
+
+
+def _resolve_business_scope(
+    db: Session,
+    current_user: User,
+    business_owner_id: int | None,
+) -> int:
+    if current_user.role in {"business_user", "content_creator"}:
+        return current_user.id
+
+    if current_user.role == "administrator":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for administrator access",
+            )
+        return business_owner_id
+
+    if current_user.role == "marketing_team":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for marketing team access",
+            )
+        assignment = (
+            db.query(BusinessAssignment)
+            .filter(
+                BusinessAssignment.marketing_team_id == current_user.id,
+                BusinessAssignment.business_user_id == business_owner_id,
+            )
+            .first()
+        )
+        if not assignment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this business user",
+            )
+        return business_owner_id
+
+    raise HTTPException(
+        status_code=403,
+        detail="You do not have permission to access campaigns",
+    )
 
 
 # ==========================================================
@@ -126,9 +181,12 @@ def _notify_status_change(
 @router.post("/", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 def create_campaign(
     campaign: CampaignCreate,
+    business_owner_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
 
     if campaign.start_date >= campaign.end_date:
         raise HTTPException(
@@ -137,7 +195,7 @@ def create_campaign(
 
     existing = (
         db.query(Campaign)
-        .filter(Campaign.user_id == current_user.id, Campaign.name == campaign.name)
+        .filter(Campaign.user_id == scope_user_id, Campaign.name == campaign.name)
         .first()
     )
 
@@ -153,7 +211,7 @@ def create_campaign(
         start_date=campaign.start_date,
         end_date=campaign.end_date,
         status="active",
-        user_id=current_user.id,
+        user_id=scope_user_id,
     )
 
     db.add(db_campaign)
@@ -377,9 +435,12 @@ def get_campaigns(
     search: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
+    business_owner_id: Optional[int] = Query(None, description="Business user id (marketing team / admin)"),
 ):
 
-    query = db.query(Campaign).filter(Campaign.user_id == current_user.id)
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
+
+    query = db.query(Campaign).filter(Campaign.user_id == scope_user_id)
 
     if status:
         query = query.filter(Campaign.status == status)

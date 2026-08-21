@@ -166,6 +166,16 @@ class PlatformAnalytics(BaseModel):
 
     views: int = 0
 
+    reach: int = 0
+
+    impressions: int = 0
+
+    clicks: int = 0
+
+    followers: int = 0
+
+    engagement: int = 0
+
     total_engagement: int
 
     average_engagement: float
@@ -199,6 +209,14 @@ class PostPerformanceMetrics(BaseModel):
     comments: int
 
     views: int
+
+    reach: int = 0
+
+    impressions: int = 0
+
+    clicks: int = 0
+
+    saves: int = 0
 
     total_engagement: int = 0
 

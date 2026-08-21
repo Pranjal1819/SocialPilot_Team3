@@ -12,7 +12,7 @@ def require_roles(*allowed_roles: str) -> Callable:
 
     Usage:
 
-        Depends(require_roles("admin"))
+        Depends(require_roles("administrator"))
 
         Depends(require_roles(
             "marketing_team",

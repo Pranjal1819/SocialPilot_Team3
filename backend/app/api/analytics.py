@@ -16,6 +16,7 @@ from app.models.scheduled_post import ScheduledPost
 from app.models.campaign import Campaign
 from app.models.social_account import SocialAccount
 from app.models.analytics import PostAnalytics
+from app.models.business_assignment import BusinessAssignment
 from app.schemas.analytics import (
     AnalyticsOverview,
     AudienceAnalytics,
@@ -31,6 +32,54 @@ from app.schemas.analytics import (
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
+# ==========================================================
+# Helper — resolve the effective business-user scope
+# ==========================================================
+
+
+def _resolve_business_scope(
+    db: Session,
+    current_user: User,
+    business_owner_id: int | None,
+) -> int:
+    if current_user.role in {"business_user", "content_creator"}:
+        return current_user.id
+
+    if current_user.role == "administrator":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for administrator access",
+            )
+        return business_owner_id
+
+    if current_user.role == "marketing_team":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for marketing team access",
+            )
+        assignment = (
+            db.query(BusinessAssignment)
+            .filter(
+                BusinessAssignment.marketing_team_id == current_user.id,
+                BusinessAssignment.business_user_id == business_owner_id,
+            )
+            .first()
+        )
+        if not assignment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this business user",
+            )
+        return business_owner_id
+
+    raise HTTPException(
+        status_code=403,
+        detail="You do not have permission to access analytics",
+    )
+
+
 @router.get("/overview", response_model=AnalyticsOverview)
 def get_analytics_overview(
     current_user: User = Depends(get_current_user),
@@ -38,7 +87,9 @@ def get_analytics_overview(
     days: Optional[int] = Query(
         30, ge=1, le=365, description="Number of days to analyze"
     ),
+    business_owner_id: Optional[int] = Query(None, description="Business user id (marketing team / admin)"),
 ):
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
     """
     Get real analytics overview for the current user.
 
@@ -57,7 +108,7 @@ def get_analytics_overview(
     posts = (
         db.query(ScheduledPost)
         .filter(
-            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.user_id == scope_user_id,
             ScheduledPost.created_at >= start_date,
             ScheduledPost.created_at <= end_date,
         )
@@ -92,7 +143,7 @@ def get_analytics_overview(
         analytics_records = (
             db.query(PostAnalytics)
             .filter(
-                PostAnalytics.user_id == current_user.id,
+                PostAnalytics.user_id == scope_user_id,
                 PostAnalytics.post_id.in_(post_ids),
                 PostAnalytics.recorded_at >= start_date,
                 PostAnalytics.recorded_at <= end_date,
@@ -354,6 +405,9 @@ def get_platform_analytics(
             shares = sum([a.shares for a in analytics])
             comments = sum([a.comments for a in analytics])
             views = sum([a.views for a in analytics])
+            reach = sum([a.reach or 0 for a in analytics])
+            impressions = sum([a.impressions or 0 for a in analytics])
+            clicks = sum([a.clicks or 0 for a in analytics])
             total_engagement = likes + shares + comments
 
             latest_analytics = (
@@ -363,8 +417,19 @@ def get_platform_analytics(
                 .first()
             )
         else:
-            likes = shares = comments = views = total_engagement = 0
+            likes = shares = comments = views = reach = impressions = clicks = total_engagement = 0
             latest_analytics = None
+
+        followers = (
+            db.query(func.coalesce(func.sum(SocialAccount.followers_count), 0))
+            .filter(
+                SocialAccount.user_id == current_user.id,
+                SocialAccount.platform.ilike(platform),
+                SocialAccount.is_active == True,
+            )
+            .scalar()
+            or 0
+        )
 
         results.append(
             PlatformAnalytics(
@@ -378,6 +443,11 @@ def get_platform_analytics(
                 shares=shares,
                 comments=comments,
                 views=views,
+                reach=reach,
+                impressions=impressions,
+                clicks=clicks,
+                followers=followers,
+                engagement=total_engagement,
                 total_engagement=total_engagement,
                 average_engagement=(
                     total_engagement / data["published_posts"]
@@ -459,6 +529,10 @@ def get_post_performance(
                 shares=analytics.shares if analytics else 0,
                 comments=analytics.comments if analytics else 0,
                 views=analytics.views if analytics else 0,
+                reach=(analytics.reach or 0) if analytics else 0,
+                impressions=(analytics.impressions or 0) if analytics else 0,
+                clicks=(analytics.clicks or 0) if analytics else 0,
+                saves=(analytics.saves or 0) if analytics else 0,
                 total_engagement=engagement,
                 engagement_rate=engagement_rate,
                 status=post.status,
@@ -559,6 +633,10 @@ def _get_ranked_posts(
                     shares=analytics.shares,
                     comments=analytics.comments,
                     views=analytics.views,
+                    reach=analytics.reach or 0,
+                    impressions=analytics.impressions or 0,
+                    clicks=analytics.clicks or 0,
+                    saves=analytics.saves or 0,
                     total_engagement=engagement,
                     engagement_rate=engagement_rate,
                     status=post.status,
@@ -647,10 +725,10 @@ def _generate_mock_analytics(platform: str) -> dict:
     purely for demo purposes.
     """
 
-    reach = random.randint(50, 5000)
-    impressions = int(reach * random.uniform(1.1, 2.5))
-    views = int(reach * random.uniform(0.8, 1.3))
-    likes = int(reach * random.uniform(0.02, 0.12))
+    reach = random.randint(50, 500)
+    impressions = int(reach * random.uniform(1.1, 2.0))
+    views = int(reach * random.uniform(0.8, 1.2))
+    likes = int(reach * random.uniform(0.02, 0.10))
     comments = int(likes * random.uniform(0.05, 0.25))
     shares = int(likes * random.uniform(0.02, 0.15))
     saves = int(likes * random.uniform(0.05, 0.3))
@@ -804,9 +882,9 @@ def _generate_mock_account_stats() -> dict:
     real data source — for demo purposes only.
     """
 
-    followers = random.randint(200, 50000)
-    following = random.randint(50, min(followers, 2000))
-    total_posts = random.randint(5, 300)
+    followers = random.randint(50, 500)
+    following = random.randint(10, min(followers, 100))
+    total_posts = random.randint(5, 50)
 
     return {
         "followers_count": followers,
@@ -1056,19 +1134,23 @@ def get_campaign_analytics(
 
 @router.get("/summary", response_model=AnalyticsSummary)
 def get_analytics_summary(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    business_owner_id: Optional[int] = Query(None, description="Business user id (marketing team / admin)"),
 ):
     """
     Get quick summary of analytics for dashboard
     """
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
+
     total_posts = (
-        db.query(ScheduledPost).filter(ScheduledPost.user_id == current_user.id).count()
+        db.query(ScheduledPost).filter(ScheduledPost.user_id == scope_user_id).count()
     )
 
     published_posts = (
         db.query(ScheduledPost)
         .filter(
-            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.user_id == scope_user_id,
             ScheduledPost.status == "published",
         )
         .count()
@@ -1077,7 +1159,7 @@ def get_analytics_summary(
     scheduled_posts = (
         db.query(ScheduledPost)
         .filter(
-            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.user_id == scope_user_id,
             ScheduledPost.status == "scheduled",
         )
         .count()
@@ -1086,7 +1168,7 @@ def get_analytics_summary(
     failed_posts = (
         db.query(ScheduledPost)
         .filter(
-            ScheduledPost.user_id == current_user.id, ScheduledPost.status == "failed"
+            ScheduledPost.user_id == scope_user_id, ScheduledPost.status == "failed"
         )
         .count()
     )
@@ -1095,21 +1177,21 @@ def get_analytics_summary(
     today_posts = (
         db.query(ScheduledPost)
         .filter(
-            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.user_id == scope_user_id,
             func.date(ScheduledPost.scheduled_time) == today,
         )
         .count()
     )
 
     analytics = (
-        db.query(PostAnalytics).filter(PostAnalytics.user_id == current_user.id).all()
+        db.query(PostAnalytics).filter(PostAnalytics.user_id == scope_user_id).all()
     )
 
     total_engagement = sum([a.likes + a.shares + a.comments for a in analytics])
 
     recent_posts = (
         db.query(ScheduledPost)
-        .filter(ScheduledPost.user_id == current_user.id)
+        .filter(ScheduledPost.user_id == scope_user_id)
         .order_by(desc(ScheduledPost.created_at))
         .limit(5)
         .all()
@@ -1136,11 +1218,11 @@ def get_analytics_summary(
         today_posts=today_posts,
         total_engagement=total_engagement,
         active_campaigns=db.query(Campaign)
-        .filter(Campaign.user_id == current_user.id, Campaign.status == "active")
+        .filter(Campaign.user_id == scope_user_id, Campaign.status == "active")
         .count(),
         connected_accounts=db.query(SocialAccount)
         .filter(
-            SocialAccount.user_id == current_user.id, SocialAccount.is_connected == True
+            SocialAccount.user_id == scope_user_id, SocialAccount.is_connected == True
         )
         .count(),
         recent_posts=recent_posts_data,
@@ -1166,6 +1248,9 @@ def get_engagement_trend(
             func.sum(PostAnalytics.shares).label("shares"),
             func.sum(PostAnalytics.comments).label("comments"),
             func.sum(PostAnalytics.views).label("views"),
+            func.sum(PostAnalytics.reach).label("reach"),
+            func.sum(PostAnalytics.impressions).label("impressions"),
+            func.sum(PostAnalytics.clicks).label("clicks"),
             func.count(PostAnalytics.id).label("count"),
         )
         .filter(
@@ -1187,6 +1272,9 @@ def get_engagement_trend(
                 "shares": row.shares,
                 "comments": row.comments,
                 "views": row.views,
+                "reach": row.reach or 0,
+                "impressions": row.impressions or 0,
+                "clicks": row.clicks or 0,
                 "engagement": engagement,
                 "posts_count": row.count,
             }

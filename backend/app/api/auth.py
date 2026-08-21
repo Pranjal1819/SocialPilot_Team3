@@ -233,7 +233,7 @@ def available_roles(db: Session = Depends(get_db)):
 
         return {"roles": ["business_user", "marketing_team", "content_creator"]}
 
-    return {"roles": ["admin", "business_user", "marketing_team", "content_creator"]}
+    return {"roles": ["administrator", "business_user", "marketing_team", "content_creator"]}
 
 
 # ============================================================

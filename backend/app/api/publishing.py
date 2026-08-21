@@ -9,11 +9,44 @@ from app.models.user import User
 from app.models.scheduled_post import ScheduledPost
 from app.models.social_account import SocialAccount
 from app.models.publish_log import PublishLog
+from app.models.business_assignment import BusinessAssignment
 
 from app.services.queue import add_to_queue
 from app.services.tasks import publish_post
 
 router = APIRouter(prefix="/api/publishing", tags=["Publishing"])
+
+
+# ==================================================
+# Helper — verify the current user may act on a post
+# belonging to a business user.
+#
+# Allowed:
+#   - the business user who owns the post
+#   - a marketing team assigned to that business user
+#   - the administrator
+# ==================================================
+
+
+def _can_manage_post(db: Session, current_user: User, post: ScheduledPost) -> bool:
+    if current_user.role == "administrator":
+        return True
+
+    if current_user.id == post.user_id:
+        return True
+
+    if current_user.role == "marketing_team":
+        assignment = (
+            db.query(BusinessAssignment)
+            .filter(
+                BusinessAssignment.marketing_team_id == current_user.id,
+                BusinessAssignment.business_user_id == post.user_id,
+            )
+            .first()
+        )
+        return assignment is not None
+
+    return False
 
 
 # ==================================================
@@ -23,12 +56,22 @@ router = APIRouter(prefix="/api/publishing", tags=["Publishing"])
 
 
 @router.get("/logs/{post_id}")
-def get_publish_logs(post_id: int, db: Session = Depends(get_db)):
+def get_publish_logs(
+    post_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
 
     post = db.query(ScheduledPost).filter(ScheduledPost.id == post_id).first()
 
     if not post:
         raise HTTPException(status_code=404, detail="Scheduled post not found")
+
+    if not _can_manage_post(db, current_user, post):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to view these publish logs",
+        )
 
     logs = (
         db.query(PublishLog)
@@ -68,14 +111,16 @@ def retry_publish(
     db: Session = Depends(get_db),
 ):
 
-    post = (
-        db.query(ScheduledPost)
-        .filter(ScheduledPost.id == post_id, ScheduledPost.user_id == current_user.id)
-        .first()
-    )
+    post = db.query(ScheduledPost).filter(ScheduledPost.id == post_id).first()
 
     if not post:
         raise HTTPException(status_code=404, detail="Scheduled post not found")
+
+    if not _can_manage_post(db, current_user, post):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to retry this post",
+        )
 
     if post.status != "failed":
         raise HTTPException(
@@ -108,16 +153,21 @@ def publish(
     db: Session = Depends(get_db),
 ):
 
-    post = (
-        db.query(ScheduledPost)
-        .filter(ScheduledPost.id == post_id, ScheduledPost.user_id == current_user.id)
-        .first()
-    )
+    post = db.query(ScheduledPost).filter(ScheduledPost.id == post_id).first()
 
     if not post:
         raise HTTPException(status_code=404, detail="Scheduled post not found")
 
-    if post.status not in ALLOWED_PUBLISH_STATUSES:
+    # Server-side assignment check: a Marketing Team may only publish
+    # posts for Business Users assigned to them. The business user who
+    # owns the post and the administrator are also allowed.
+    if not _can_manage_post(db, current_user, post):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not assigned to this client and cannot publish this post",
+        )
+
+    if post.status not in ALLOWED_PUBLISH_NOW_STATUSES:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -126,11 +176,14 @@ def publish(
             ),
         )
 
+    # The social account belongs to the business user (post.user_id).
+    # The access token is retrieved server-side and never exposed to
+    # the marketing team.
     account = (
         db.query(SocialAccount)
         .filter(
             SocialAccount.id == post.social_account_id,
-            SocialAccount.user_id == current_user.id,
+            SocialAccount.user_id == post.user_id,
             SocialAccount.is_active == True,
         )
         .first()

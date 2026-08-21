@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -27,8 +28,18 @@ from app.schemas.generated_report import (
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
-REPORTS_DIR = Path("app/static/reports")
+REPORTS_DIR = Path(__file__).resolve().parents[1] / "static" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _report_scope_user(current_user: User, requested_user_id: Optional[int], db: Session) -> int:
+    if requested_user_id is None:
+        return current_user.id
+    if current_user.role != "administrator" and requested_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only access your own reports")
+    if not db.query(User).filter(User.id == requested_user_id).first():
+        raise HTTPException(status_code=404, detail="User not found")
+    return requested_user_id
 
 
 # ==========================================================
@@ -205,8 +216,10 @@ def _build_campaign_report(
 
     return {
         "summary": {
+            "campaign_id": campaign.id,
             "campaign_name": campaign.name,
             "platform": campaign.platform,
+            "description": campaign.description or "",
             "status": campaign.status,
             "start_date": campaign.start_date.isoformat(),
             "end_date": campaign.end_date.isoformat(),
@@ -392,16 +405,20 @@ def _build_platform_comparison_report(db, user_id, start_date, end_date) -> dict
         .all()
     )
 
-    followers_by_platform = {a.platform: a.followers_count for a in accounts}
+    followers_by_platform = {}
+    for account in accounts:
+        platform_name = (account.platform or "").lower()
+        followers_by_platform[platform_name] = followers_by_platform.get(platform_name, 0) + (account.followers_count or 0)
 
     platforms = {}
 
     for r in rows:
 
+        platform_name = (r.platform or "").lower()
         p = platforms.setdefault(
-            r.platform,
+            platform_name,
             {
-                "platform": r.platform,
+                "platform": platform_name,
                 "reach": 0,
                 "impressions": 0,
                 "likes": 0,
@@ -523,9 +540,10 @@ def preview_report(
     request: ReportGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user_id: Optional[int] = Query(None, ge=1),
 ):
 
-    data = _build_report_data(db, current_user.id, request)
+    data = _build_report_data(db, _report_scope_user(current_user, user_id, db), request)
 
     title = request.report_name or _default_report_name(request.report_type)
 
@@ -556,16 +574,19 @@ def generate_report(
     request: ReportGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user_id: Optional[int] = Query(None, ge=1),
 ):
+
+    report_user_id = _report_scope_user(current_user, user_id, db)
 
     report_name = request.report_name or _default_report_name(request.report_type)
 
-    filters = request.dict(
+    filters = jsonable_encoder(request.dict(
         exclude={"report_type", "export_format", "report_name"}, exclude_none=True
-    )
+    ))
 
     db_report = GeneratedReport(
-        user_id=current_user.id,
+        user_id=report_user_id,
         campaign_id=request.campaign_id,
         report_name=report_name,
         report_type=request.report_type.value,
@@ -580,7 +601,7 @@ def generate_report(
 
     try:
 
-        data = _build_report_data(db, current_user.id, request)
+        data = _build_report_data(db, report_user_id, request)
 
         if request.export_format.value == "excel":
 
@@ -626,9 +647,14 @@ def get_reports(
     limit: int = Query(20, ge=1, le=100),
     report_type: Optional[str] = None,
     search: Optional[str] = None,
+    user_id: Optional[int] = Query(None, ge=1),
 ):
 
-    query = db.query(GeneratedReport).filter(GeneratedReport.user_id == current_user.id)
+    if current_user.role == "administrator" and user_id is None:
+        query = db.query(GeneratedReport)
+    else:
+        scope_user_id = _report_scope_user(current_user, user_id, db)
+        query = db.query(GeneratedReport).filter(GeneratedReport.user_id == scope_user_id)
 
     if report_type:
         query = query.filter(GeneratedReport.report_type == report_type)
@@ -659,14 +685,10 @@ def download_report(
     db: Session = Depends(get_db),
 ):
 
-    report = (
-        db.query(GeneratedReport)
-        .filter(
-            GeneratedReport.id == report_id,
-            GeneratedReport.user_id == current_user.id,
-        )
-        .first()
-    )
+    report_query = db.query(GeneratedReport).filter(GeneratedReport.id == report_id)
+    if current_user.role != "administrator":
+        report_query = report_query.filter(GeneratedReport.user_id == current_user.id)
+    report = report_query.first()
 
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -675,6 +697,8 @@ def download_report(
         raise HTTPException(status_code=400, detail="Report is not ready for download")
 
     file_path = Path(report.file_path)
+    if not file_path.is_absolute():
+        file_path = Path(__file__).resolve().parents[1] / "static" / "reports" / file_path.name
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Report file missing on disk")
@@ -694,6 +718,42 @@ def download_report(
         filename=file_path.name,
     )
 
+@router.get("/{report_id}", response_model=ReportPreviewResponse)
+def get_report(
+    report_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the full preview data for a saved report."""
+    report_query = db.query(GeneratedReport).filter(GeneratedReport.id == report_id)
+    if current_user.role != "administrator":
+        report_query = report_query.filter(GeneratedReport.user_id == current_user.id)
+    report = report_query.first()
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    filters = report.filters or {}
+    request = ReportGenerateRequest(
+        report_type=report.report_type,
+        export_format=report.export_format,
+        campaign_id=filters.get("campaign_id"),
+        platform=filters.get("platform"),
+        content_type=filters.get("content_type"),
+        start_date=filters.get("start_date"),
+        end_date=filters.get("end_date"),
+        report_name=report.report_name,
+    )
+    data = _build_report_data(db, report.user_id, request)
+    return ReportPreviewResponse(
+        report_type=request.report_type,
+        title=report.report_name,
+        generated_at=report.created_at,
+        filters_applied=filters,
+        summary=data["summary"],
+        tables=data["tables"],
+    )
+
 
 # ==========================================================
 # DELETE REPORT
@@ -707,14 +767,10 @@ def delete_report(
     db: Session = Depends(get_db),
 ):
 
-    report = (
-        db.query(GeneratedReport)
-        .filter(
-            GeneratedReport.id == report_id,
-            GeneratedReport.user_id == current_user.id,
-        )
-        .first()
-    )
+    report_query = db.query(GeneratedReport).filter(GeneratedReport.id == report_id)
+    if current_user.role != "administrator":
+        report_query = report_query.filter(GeneratedReport.user_id == current_user.id)
+    report = report_query.first()
 
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -722,6 +778,8 @@ def delete_report(
     if report.file_path:
 
         file_path = Path(report.file_path)
+        if not file_path.is_absolute():
+            file_path = Path(__file__).resolve().parents[1] / "static" / "reports" / file_path.name
 
         if file_path.exists():
             file_path.unlink()
@@ -973,29 +1031,20 @@ def _export_excel(report_id: int, title: str, data: dict) -> Path:
 
     _autofit_sheet(summary_sheet)
 
-    # --------------------------------------------------
-    # One sheet per table section
-    # --------------------------------------------------
+    # Keep every detailed table in one predictable worksheet so exported
+    # files always have the required Summary and Detailed Report sheets.
+    detail_sheet = wb.create_sheet("Detailed Report")
+    detail_sheet.append(["Section", "Field", "Value"])
+    for cell in detail_sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
 
     for table_name, table_rows in data["tables"].items():
-
-        if not table_rows:
-            continue
-
-        sheet = wb.create_sheet(table_name.replace("_", " ").title()[:31])
-
-        headers = list(table_rows[0].keys())
-
-        sheet.append(headers)
-
-        for cell in sheet[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-
         for row in table_rows:
-            sheet.append([row.get(h) for h in headers])
+            for key, value in row.items():
+                detail_sheet.append([table_name.replace("_", " ").title(), key, value])
 
-        _autofit_sheet(sheet)
+    _autofit_sheet(detail_sheet)
 
     wb.save(str(file_path))
 

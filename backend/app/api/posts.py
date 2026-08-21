@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.scheduled_post import ScheduledPost
 from app.models.social_account import SocialAccount
 from app.models.post_media import PostMedia
+from app.models.business_assignment import BusinessAssignment
 
 from app.services.media_storage import save_upload, MediaUploadError
 
@@ -25,6 +26,54 @@ from app.services.queue import (
 )
 
 router = APIRouter(prefix="/api/posts", tags=["Posts"])
+
+
+# =================================================
+# Helper — resolve the effective business-user scope
+# =================================================
+
+
+def _resolve_business_scope(
+    db: Session,
+    current_user: User,
+    business_owner_id: int | None,
+) -> int:
+    if current_user.role in {"business_user", "content_creator"}:
+        return current_user.id
+
+    if current_user.role == "administrator":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for administrator access",
+            )
+        return business_owner_id
+
+    if current_user.role == "marketing_team":
+        if business_owner_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="business_owner_id is required for marketing team access",
+            )
+        assignment = (
+            db.query(BusinessAssignment)
+            .filter(
+                BusinessAssignment.marketing_team_id == current_user.id,
+                BusinessAssignment.business_user_id == business_owner_id,
+            )
+            .first()
+        )
+        if not assignment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this business user",
+            )
+        return business_owner_id
+
+    raise HTTPException(
+        status_code=403,
+        detail="You do not have permission to access posts",
+    )
 
 
 # =================================================
@@ -62,9 +111,12 @@ async def upload_media(
 @router.post("/", response_model=ScheduledPostResponse)
 def create_post(
     post: ScheduledPostCreate,
+    business_owner_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
 
     # ---------------------------------------------
     # Validate Social Account
@@ -74,7 +126,7 @@ def create_post(
         db.query(SocialAccount)
         .filter(
             SocialAccount.id == post.social_account_id,
-            SocialAccount.user_id == current_user.id,
+            SocialAccount.user_id == scope_user_id,
             SocialAccount.is_active == True,
         )
         .first()
@@ -95,7 +147,7 @@ def create_post(
     # TypeError. Fields are set explicitly instead.
 
     db_post = ScheduledPost(
-        user_id=current_user.id,
+        user_id=scope_user_id,
         campaign_id=post.campaign_id,
         social_account_id=post.social_account_id,
         title=post.title,
@@ -157,11 +209,14 @@ def get_posts(
     platform: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
+    business_owner_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
 
-    query = db.query(ScheduledPost).filter(ScheduledPost.user_id == current_user.id)
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
+
+    query = db.query(ScheduledPost).filter(ScheduledPost.user_id == scope_user_id)
 
     if status:
 
@@ -183,11 +238,14 @@ def get_posts(
 def get_calendar(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    business_owner_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
 
-    query = db.query(ScheduledPost).filter(ScheduledPost.user_id == current_user.id)
+    scope_user_id = _resolve_business_scope(db, current_user, business_owner_id)
+
+    query = db.query(ScheduledPost).filter(ScheduledPost.user_id == scope_user_id)
 
     if start_date:
 

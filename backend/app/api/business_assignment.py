@@ -26,7 +26,7 @@ def assign_business_to_marketing(
     business_user_id: int,
     marketing_team_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(require_roles("admin")),
+    current_admin: User = Depends(require_roles("administrator")),
 ):
 
     business_user = (
@@ -99,7 +99,7 @@ def assign_business_to_marketing(
 @router.get("/assignments")
 def get_all_assignments(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(require_roles("admin")),
+    current_admin: User = Depends(require_roles("administrator")),
 ):
 
     assignments = db.query(BusinessAssignment).all()
@@ -141,7 +141,7 @@ def get_all_assignments(
 def remove_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(require_roles("admin")),
+    current_admin: User = Depends(require_roles("administrator")),
 ):
 
     assignment = (
@@ -238,3 +238,50 @@ def get_my_marketing_team(
             )
 
     return teams
+
+
+# =====================================================
+# Business User - Choose Marketing Team
+# =====================================================
+
+
+@router.post("/my-marketing-team")
+def assign_my_marketing_team(
+    marketing_team_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("business_user")),
+):
+    team = (
+        db.query(User)
+        .filter(
+            User.id == marketing_team_id,
+            User.role == "marketing_team",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+
+    if not team:
+        raise HTTPException(status_code=404, detail="Marketing team not found")
+
+    assignments = (
+        db.query(BusinessAssignment)
+        .filter(BusinessAssignment.business_user_id == current_user.id)
+        .all()
+    )
+
+    if len(assignments) == 1 and assignments[0].marketing_team_id == team.id:
+        return {"message": "Marketing team is already assigned", "team": team.name}
+
+    for assignment in assignments:
+        db.delete(assignment)
+
+    db.add(
+        BusinessAssignment(
+            business_user_id=current_user.id,
+            marketing_team_id=team.id,
+        )
+    )
+    db.commit()
+
+    return {"message": "Marketing team assigned successfully", "team": team.name}

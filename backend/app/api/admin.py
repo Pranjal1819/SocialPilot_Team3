@@ -9,6 +9,8 @@ from app.core.dependencies import get_current_admin
 from app.models.user import User
 from app.models.campaign import Campaign
 from app.models.scheduled_post import ScheduledPost
+from app.models.social_account import SocialAccount
+from app.models.analytics import PostAnalytics
 
 router = APIRouter(
     prefix="/api/admin",
@@ -178,6 +180,7 @@ def get_all_users(
                 "scheduled_posts": scheduled_posts,
                 "draft_posts": draft_posts,
                 "failed_posts": failed_posts,
+                "connected_accounts": db.query(SocialAccount).filter(SocialAccount.user_id == user.id).count(),
             }
         )
 
@@ -282,7 +285,7 @@ def update_user_status(
             detail="User not found"
         )
 
-    if user.role == "admin":
+    if user.role == "administrator":
         raise HTTPException(
             status_code=400,
             detail="Admin account cannot be disabled"
@@ -297,6 +300,63 @@ def update_user_status(
         "message": "User status updated successfully",
         "user_id": user.id,
         "is_active": user.is_active,
+    }
+
+
+@router.get("/analytics")
+def admin_analytics(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+    user_id: int | None = Query(None, ge=1),
+):
+    """Return database-backed platform metrics for all users or one user."""
+    users_query = db.query(User)
+    if user_id is not None:
+        users_query = users_query.filter(User.id == user_id)
+    users = users_query.all()
+    user_ids = [user.id for user in users]
+
+    posts = db.query(ScheduledPost).filter(ScheduledPost.user_id.in_(user_ids)).all() if user_ids else []
+    analytics = db.query(PostAnalytics).filter(PostAnalytics.user_id.in_(user_ids)).all() if user_ids else []
+    by_user = []
+    by_platform = {}
+    for row in analytics:
+        platform = (row.platform or "unknown").lower()
+        metric = by_platform.setdefault(platform, {"platform": platform, "posts": 0, "engagement": 0, "reach": 0, "impressions": 0})
+        metric["posts"] += 1
+        metric["engagement"] += (row.likes or 0) + (row.comments or 0) + (row.shares or 0)
+        metric["reach"] += row.reach or 0
+        metric["impressions"] += row.impressions or 0
+    for user in users:
+        user_posts = [post for post in posts if post.user_id == user.id]
+        user_analytics = [row for row in analytics if row.user_id == user.id]
+        by_user.append({
+            "user_id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "total_posts": len(user_posts),
+            "published_posts": sum(post.status == "published" for post in user_posts),
+            "scheduled_posts": sum(post.status == "scheduled" for post in user_posts),
+            "draft_posts": sum(post.status == "draft" for post in user_posts),
+            "total_engagement": sum((row.likes or 0) + (row.comments or 0) + (row.shares or 0) for row in user_analytics),
+            "reach": sum(row.reach or 0 for row in user_analytics),
+            "impressions": sum(row.impressions or 0 for row in user_analytics),
+        })
+
+    return {
+        "totals": {
+            "total_users": len(users),
+            "business_owners": sum(user.role in ("business_owner", "business_user") for user in users),
+            "marketing_teams": sum(user.role == "marketing_team" for user in users),
+            "content_creators": sum(user.role == "content_creator" for user in users),
+            "active_users": sum(bool(user.is_active) for user in users),
+            "suspended_users": sum(not user.is_active for user in users),
+            "total_posts": len(posts),
+            "total_engagement": sum((row.likes or 0) + (row.comments or 0) + (row.shares or 0) for row in analytics),
+        },
+        "users": by_user,
+        "platforms": list(by_platform.values()),
     }
 
 
@@ -326,7 +386,7 @@ def delete_user(
             detail="User not found"
         )
 
-    if user.role == "admin":
+    if user.role == "administrator":
         raise HTTPException(
             status_code=400,
             detail="Administrator cannot be deleted"
